@@ -1,0 +1,45 @@
+.app {
+  min-height: 100vh;
+  background: #12121e;
+  color: #e0e0f0;
+  font-family: system-ui, 'Segoe UI', sans-serif;
+}
+
+.app-header {
+  padding: 2rem;
+  text-align: center;
+  border-bottom: 1px solid #1e1e3a;
+}
+
+.app-header h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #e0e0ff;
+  letter-spacing: -0.5px;
+}
+
+.subtitle {
+  color: #666;
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.fixture-list {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.status {
+  text-align: center;
+  color: #888;
+  padding: 2rem;
+}
+
+.status.error {
+  color: #f44336;
+}

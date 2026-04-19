@@ -1,0 +1,56 @@
+.heatmap-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.65rem;
+}
+
+.heatmap-away-label {
+  text-align: center;
+  color: #888;
+  font-size: 0.65rem;
+}
+
+.heatmap-body {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+}
+
+.heatmap-home-label {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  color: #888;
+  font-size: 0.65rem;
+  white-space: nowrap;
+}
+
+.heatmap-grid {
+  display: grid;
+  gap: 2px;
+}
+
+.heatmap-cell {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  font-size: 0.55rem;
+}
+
+.heatmap-cell.header {
+  color: #777;
+  font-weight: 600;
+  background: transparent;
+}
+
+.heatmap-cell.corner {
+  background: transparent;
+}
+
+.heatmap-cell.data {
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 500;
+}
