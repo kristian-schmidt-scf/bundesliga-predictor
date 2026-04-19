@@ -2,9 +2,9 @@ import ScoreHeatmap from './ScoreHeatmap'
 import OddsComparison from './OddsComparison'
 import './FixtureCard.css'
 
-function ProbBar({ label, value, highlight }) {
+function ProbBar({ label, value }) {
   return (
-    <div className={`prob-bar-row${highlight ? ' highlight' : ''}`}>
+    <div className="prob-bar-row">
       <span className="prob-label">{label}</span>
       <div className="prob-track">
         <div className="prob-fill" style={{ width: `${(value * 100).toFixed(1)}%` }} />
@@ -16,17 +16,25 @@ function ProbBar({ label, value, highlight }) {
 
 export default function FixtureCard({ prediction }) {
   const { fixture, win_probabilities, expected_home_goals, expected_away_goals, most_likely_score, score_matrix, odds, edge_home_win, edge_draw, edge_away_win } = prediction
-  const { home_team, away_team, utc_date, matchday } = fixture
+  const { home_team, away_team, utc_date, status, home_score, away_score } = fixture
+
+  const isFinished = status === 'FINISHED'
+  const isLive = ['IN_PLAY', 'PAUSED', 'LIVE'].includes(status)
 
   const kickoff = new Date(utc_date).toLocaleString('en-GB', {
     weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
   })
 
+  const actualScore = isFinished && home_score != null && away_score != null
+    ? { home: home_score, away: away_score }
+    : null
+
   return (
-    <div className="fixture-card">
+    <div className={`fixture-card${isFinished ? ' finished' : ''}${isLive ? ' live' : ''}`}>
       <div className="fixture-header">
-        <span className="matchday">Matchday {matchday}</span>
         <span className="kickoff">{kickoff}</span>
+        {isFinished && <span className="status-badge finished">FT</span>}
+        {isLive && <span className="status-badge live">LIVE</span>}
       </div>
 
       <div className="teams-row">
@@ -35,8 +43,14 @@ export default function FixtureCard({ prediction }) {
           <span>{home_team.name}</span>
         </div>
         <div className="vs-block">
-          <span className="vs">vs</span>
-          <span className="likely-score">{most_likely_score}</span>
+          {actualScore ? (
+            <span className="actual-score">{actualScore.home} – {actualScore.away}</span>
+          ) : (
+            <span className="vs">vs</span>
+          )}
+          <span className="likely-score">
+            {actualScore ? `Model: ${most_likely_score}` : most_likely_score}
+          </span>
           <span className="xg">xG {expected_home_goals.toFixed(2)} – {expected_away_goals.toFixed(2)}</span>
         </div>
         <div className="team away">
@@ -52,7 +66,7 @@ export default function FixtureCard({ prediction }) {
       </div>
 
       <div className="card-lower">
-        <ScoreHeatmap matrix={score_matrix} />
+        <ScoreHeatmap matrix={score_matrix} actualScore={actualScore} />
         {odds && (
           <OddsComparison
             odds={odds}

@@ -1,5 +1,6 @@
+import asyncio
 from fastapi import APIRouter, HTTPException
-from app.services import football_data, odds
+from app.services import football_data, odds, prediction_cache
 from app.services.dixon_coles import get_model
 from app.models.schemas import Prediction, ScoreMatrix, WinProbabilities
 import logging
@@ -7,12 +8,48 @@ import logging
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/predictions", tags=["predictions"])
 
+LIVE_STATUSES = {"IN_PLAY", "PAUSED", "LIVE"}
+FINISHED_STATUSES = {"FINISHED", "AWARDED"}
+
+
+def _build_prediction(fixture, pred, match_odds) -> Prediction:
+    home = fixture.home_team.name
+    away = fixture.away_team.name
+    edge_home = edge_draw = edge_away = None
+    if match_odds:
+        edge_home = round(pred["home_win"] - (match_odds.implied_home_prob or 0), 4)
+        edge_draw = round(pred["draw"] - (match_odds.implied_draw_prob or 0), 4)
+        edge_away = round(pred["away_win"] - (match_odds.implied_away_prob or 0), 4)
+    return Prediction(
+        fixture=fixture,
+        score_matrix=ScoreMatrix(
+            matrix=pred["score_matrix"],
+            max_goals=pred["max_goals"],
+            home_team=home,
+            away_team=away,
+        ),
+        win_probabilities=WinProbabilities(
+            home_win=pred["home_win"],
+            draw=pred["draw"],
+            away_win=pred["away_win"],
+        ),
+        expected_home_goals=pred["expected_home_goals"],
+        expected_away_goals=pred["expected_away_goals"],
+        most_likely_score=pred["most_likely_score"],
+        odds=match_odds,
+        edge_home_win=edge_home,
+        edge_draw=edge_draw,
+        edge_away_win=edge_away,
+    )
+
 
 @router.get("/upcoming", response_model=list[Prediction])
 async def get_predictions_for_upcoming_fixtures():
     """
-    Returns Dixon-Coles predictions for all upcoming Bundesliga fixtures,
-    enriched with bookmaker odds where available.
+    Returns Dixon-Coles predictions for current and upcoming Bundesliga fixtures.
+    Includes finished/live games from the last 7 days so the current matchday
+    remains visible after kickoff. Predictions for live/finished games are served
+    from cache (frozen at the last pre-kickoff computation).
     """
     model = get_model()
     if not model.fitted:
@@ -21,10 +58,8 @@ async def get_predictions_for_upcoming_fixtures():
             detail="Model not yet fitted. Try again in a moment — fitting runs on startup.",
         )
 
-    # Fetch fixtures and odds concurrently
-    import asyncio
     fixtures, odds_map = await asyncio.gather(
-        football_data.get_upcoming_fixtures(),
+        football_data.get_current_and_upcoming_fixtures(),
         odds.get_bundesliga_odds(),
     )
 
@@ -32,6 +67,16 @@ async def get_predictions_for_upcoming_fixtures():
     for fixture in fixtures:
         home = fixture.home_team.name
         away = fixture.away_team.name
+        is_settled = fixture.status in LIVE_STATUSES | FINISHED_STATUSES
+
+        # Serve from cache for live/finished games so the prediction is frozen
+        # at the last pre-kickoff value. Fall through to compute if cache is cold.
+        if is_settled:
+            cached = prediction_cache.get(fixture.id)
+            if cached:
+                # Update the fixture object so status reflects reality
+                predictions.append(cached.model_copy(update={"fixture": fixture}))
+                continue
 
         try:
             pred = model.predict(home, away)
@@ -39,39 +84,11 @@ async def get_predictions_for_upcoming_fixtures():
             logger.warning(f"Prediction failed for {home} vs {away}: {e}")
             continue
 
-        # Match odds
         match_odds = odds.find_odds_for_fixture(odds_map, home, away)
+        prediction = _build_prediction(fixture, pred, match_odds)
 
-        # Edge calculation (model probability - bookmaker implied probability)
-        edge_home = edge_draw = edge_away = None
-        if match_odds:
-            edge_home = round(pred["home_win"] - (match_odds.implied_home_prob or 0), 4)
-            edge_draw = round(pred["draw"] - (match_odds.implied_draw_prob or 0), 4)
-            edge_away = round(pred["away_win"] - (match_odds.implied_away_prob or 0), 4)
-
-        predictions.append(
-            Prediction(
-                fixture=fixture,
-                score_matrix=ScoreMatrix(
-                    matrix=pred["score_matrix"],
-                    max_goals=pred["max_goals"],
-                    home_team=home,
-                    away_team=away,
-                ),
-                win_probabilities=WinProbabilities(
-                    home_win=pred["home_win"],
-                    draw=pred["draw"],
-                    away_win=pred["away_win"],
-                ),
-                expected_home_goals=pred["expected_home_goals"],
-                expected_away_goals=pred["expected_away_goals"],
-                most_likely_score=pred["most_likely_score"],
-                odds=match_odds,
-                edge_home_win=edge_home,
-                edge_draw=edge_draw,
-                edge_away_win=edge_away,
-            )
-        )
+        prediction_cache.set(fixture.id, prediction)
+        predictions.append(prediction)
 
     return predictions
 

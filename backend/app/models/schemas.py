@@ -21,6 +21,8 @@ class Fixture(BaseModel):
     utc_date: datetime
     matchday: int
     status: str  # SCHEDULED, LIVE, FINISHED, etc.
+    home_score: Optional[int] = None
+    away_score: Optional[int] = None
 
 
 # ---------------------------------------------------------------------------

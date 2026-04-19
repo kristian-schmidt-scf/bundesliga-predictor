@@ -30,7 +30,29 @@ async def get_upcoming_fixtures(matchdays_ahead: int = 5) -> list[Fixture]:
     for match in data.get("matches", []):
         fixtures.append(_parse_fixture(match))
 
-    # Sort by date and limit
+    fixtures.sort(key=lambda f: f.utc_date)
+    return fixtures
+
+
+async def get_current_and_upcoming_fixtures() -> list[Fixture]:
+    """
+    Fetch fixtures from the last 7 days through the end of scheduled matches.
+    Includes FINISHED games from the current matchday alongside upcoming ones.
+    """
+    from datetime import timedelta
+    now = datetime.now(timezone.utc)
+    date_from = (now - timedelta(days=14)).strftime("%Y-%m-%d")
+    date_to = (now + timedelta(days=60)).strftime("%Y-%m-%d")
+
+    url = f"{settings.football_data_base_url}/competitions/{settings.bundesliga_competition_code}/matches"
+    params = {"dateFrom": date_from, "dateTo": date_to}
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(url, headers=HEADERS, params=params, timeout=10)
+        resp.raise_for_status()
+
+    data = resp.json()
+    fixtures = [_parse_fixture(m) for m in data.get("matches", [])]
     fixtures.sort(key=lambda f: f.utc_date)
     return fixtures
 
@@ -106,6 +128,7 @@ async def get_current_season_results() -> list[dict]:
 def _parse_fixture(match: dict) -> Fixture:
     home = match["homeTeam"]
     away = match["awayTeam"]
+    full_time = match.get("score", {}).get("fullTime", {})
     return Fixture(
         id=match["id"],
         home_team=Team(
@@ -123,4 +146,6 @@ def _parse_fixture(match: dict) -> Fixture:
         utc_date=datetime.fromisoformat(match["utcDate"].replace("Z", "+00:00")),
         matchday=match.get("matchday", 0),
         status=match["status"],
+        home_score=full_time.get("home"),
+        away_score=full_time.get("away"),
     )
