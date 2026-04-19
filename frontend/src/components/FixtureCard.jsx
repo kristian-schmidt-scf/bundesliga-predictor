@@ -25,7 +25,7 @@ export default function FixtureCard({ prediction }) {
     weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
   })
 
-  const actualScore = isFinished && home_score != null && away_score != null
+  const actualScore = (isFinished || isLive) && home_score != null && away_score != null
     ? { home: home_score, away: away_score }
     : null
 
