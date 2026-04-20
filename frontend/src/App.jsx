@@ -18,15 +18,46 @@ function groupByMatchday(predictions) {
 }
 
 function defaultMatchday(groups) {
-  // 1. Matchday with live games
   const live = groups.find(g => g.fixtures.some(p => LIVE_STATUSES.has(p.fixture.status)))
   if (live) return live.matchday
-  // 2. Next upcoming matchday
   const upcoming = groups.find(g => g.fixtures.some(p => p.fixture.status === 'SCHEDULED'))
   if (upcoming) return upcoming.matchday
-  // 3. Last fully finished matchday
   const finished = groups.filter(g => g.fixtures.every(p => p.fixture.status === 'FINISHED'))
   return finished.length > 0 ? finished[finished.length - 1].matchday : groups[0]?.matchday
+}
+
+function MatchupSidebar({ predictions, onSelect }) {
+  return (
+    <aside className="matchup-sidebar">
+      {predictions.map(p => {
+        const { fixture } = p
+        const { home_team, away_team, status, home_score, away_score } = fixture
+        const isLive = LIVE_STATUSES.has(status)
+        const isFinished = status === 'FINISHED'
+        const hasScore = home_score != null && away_score != null
+        return (
+          <button
+            key={fixture.id}
+            className={`matchup-item${isLive ? ' live' : ''}${isFinished ? ' finished' : ''}`}
+            onClick={() => onSelect(fixture.id)}
+          >
+            <span className="si-team si-home">
+              {home_team.crest_url && <img src={home_team.crest_url} className="si-crest" alt="" />}
+              <span>{home_team.short_name}</span>
+            </span>
+            <span className="si-score">
+              {isLive && <span className="si-dot" />}
+              {hasScore ? `${home_score}–${away_score}` : 'vs'}
+            </span>
+            <span className="si-team si-away">
+              <span>{away_team.short_name}</span>
+              {away_team.crest_url && <img src={away_team.crest_url} className="si-crest" alt="" />}
+            </span>
+          </button>
+        )
+      })}
+    </aside>
+  )
 }
 
 export default function App() {
@@ -99,6 +130,10 @@ export default function App() {
     }
   }
 
+  function scrollToFixture(id) {
+    document.getElementById(`fixture-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
   return (
     <div className="app">
       <header className="app-header">
@@ -106,86 +141,96 @@ export default function App() {
         <p className="subtitle">Dixon-Coles model vs bookmaker odds</p>
       </header>
 
-      <main className="fixture-list">
-        {loading && <div className="status">Loading predictions…</div>}
-        {error && <div className="status error">Error: {error}</div>}
+      <div className="app-body">
+        {visiblePredictions.length > 0 && (
+          <MatchupSidebar predictions={visiblePredictions} onSelect={scrollToFixture} />
+        )}
 
-        {groups.length > 0 && (
-          <div className="filter-bar">
-            <div className="filter-group">
-              <label htmlFor="matchday-select">Spieltag</label>
-              <select
-                id="matchday-select"
-                value={selectedMatchday ?? ''}
-                onChange={e => { setSelectedMatchday(Number(e.target.value)); setLiveOnly(false) }}
-                disabled={liveOnly || !!selectedTeam}
-              >
-                {groups.map(g => (
-                  <option key={g.matchday} value={g.matchday}>Spieltag {g.matchday}</option>
-                ))}
-              </select>
-            </div>
+        <div className="content-column">
+          {loading && <div className="status">Loading predictions…</div>}
+          {error && <div className="status error">Error: {error}</div>}
 
-            <button
-              className={`live-btn${liveOnly ? ' active' : ''}${liveCount === 0 ? ' disabled' : ''}`}
-              onClick={() => { if (liveCount > 0) setLiveOnly(v => !v) }}
-            >
-              <span className={`live-dot${liveCount > 0 ? ' pulsing' : ''}`} />
-              Live{liveCount > 0 ? ` (${liveCount})` : ''}
-            </button>
-
-            <button
-              className={`live-btn${showTipp11 ? ' active' : ''}`}
-              onClick={() => setShowTipp11(v => !v)}
-            >
-              Tipp 11
-            </button>
-
-            <button
-              className={`live-btn${blendOdds ? ' active' : ''}`}
-              onClick={() => setBlendOdds(v => !v)}
-              title="Blend Dixon-Coles (50%) with bookmaker implied probabilities (50%)"
-            >
-              + Bookmaker Odds
-            </button>
-
-            <div className="filter-group team-filter">
-              <label htmlFor="team-select">Team</label>
-              <select
-                id="team-select"
-                value={selectedTeam}
-                onChange={e => { setSelectedTeam(e.target.value); setLiveOnly(false) }}
-              >
-                <option value="">All teams</option>
-                {teams.map(t => (
-                  <option key={t} value={t}>
-                    {favoriteTeam === t ? '★ ' : ''}{t}
-                  </option>
-                ))}
-              </select>
-              {selectedTeam && (
-                <button
-                  className={`fav-btn${favoriteTeam === selectedTeam ? ' active' : ''}`}
-                  onClick={toggleFavorite}
-                  title={favoriteTeam === selectedTeam ? 'Remove favourite' : 'Set as favourite'}
+          {groups.length > 0 && (
+            <div className="filter-bar">
+              <div className="filter-group">
+                <label htmlFor="matchday-select">Spieltag</label>
+                <select
+                  id="matchday-select"
+                  value={selectedMatchday ?? ''}
+                  onChange={e => { setSelectedMatchday(Number(e.target.value)); setLiveOnly(false) }}
+                  disabled={liveOnly || !!selectedTeam}
                 >
-                  ★
-                </button>
-              )}
+                  {groups.map(g => (
+                    <option key={g.matchday} value={g.matchday}>Spieltag {g.matchday}</option>
+                  ))}
+                </select>
+              </div>
+
+              <button
+                className={`live-btn${liveOnly ? ' active' : ''}${liveCount === 0 ? ' disabled' : ''}`}
+                onClick={() => { if (liveCount > 0) setLiveOnly(v => !v) }}
+              >
+                <span className={`live-dot${liveCount > 0 ? ' pulsing' : ''}`} />
+                Live{liveCount > 0 ? ` (${liveCount})` : ''}
+              </button>
+
+              <button
+                className={`live-btn${showTipp11 ? ' active' : ''}`}
+                onClick={() => setShowTipp11(v => !v)}
+              >
+                Tipp 11
+              </button>
+
+              <button
+                className={`live-btn${blendOdds ? ' active' : ''}`}
+                onClick={() => setBlendOdds(v => !v)}
+                title="Blend Dixon-Coles (50%) with bookmaker implied probabilities (50%)"
+              >
+                + Bookmaker Odds
+              </button>
+
+              <div className="filter-group team-filter">
+                <label htmlFor="team-select">Team</label>
+                <select
+                  id="team-select"
+                  value={selectedTeam}
+                  onChange={e => { setSelectedTeam(e.target.value); setLiveOnly(false) }}
+                >
+                  <option value="">All teams</option>
+                  {teams.map(t => (
+                    <option key={t} value={t}>
+                      {favoriteTeam === t ? '★ ' : ''}{t}
+                    </option>
+                  ))}
+                </select>
+                {selectedTeam && (
+                  <button
+                    className={`fav-btn${favoriteTeam === selectedTeam ? ' active' : ''}`}
+                    onClick={toggleFavorite}
+                    title={favoriteTeam === selectedTeam ? 'Remove favourite' : 'Set as favourite'}
+                  >
+                    ★
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {visiblePredictions.length === 0 && !loading && (
-          <div className="status">
-            {liveOnly ? 'No games currently live.' : 'No fixtures to show.'}
-          </div>
-        )}
+          {visiblePredictions.length === 0 && !loading && (
+            <div className="status">
+              {liveOnly ? 'No games currently live.' : 'No fixtures to show.'}
+            </div>
+          )}
 
-        {visiblePredictions.map(p => (
-          <FixtureCard key={p.fixture.id} prediction={p} showTipp11={showTipp11} blendOdds={blendOdds} />
-        ))}
-      </main>
+          <div className="fixture-list">
+            {visiblePredictions.map(p => (
+              <div key={p.fixture.id} id={`fixture-${p.fixture.id}`}>
+                <FixtureCard prediction={p} showTipp11={showTipp11} blendOdds={blendOdds} />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
