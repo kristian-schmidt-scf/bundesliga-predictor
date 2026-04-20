@@ -37,6 +37,7 @@ export default function App() {
   const [selectedTeam, setSelectedTeam] = useState('')
   const [favoriteTeam, setFavoriteTeam] = useState(() => localStorage.getItem('favTeam') ?? '')
   const [showTipp11, setShowTipp11] = useState(false)
+  const [blendOdds, setBlendOdds] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -140,6 +141,14 @@ export default function App() {
               Tipp 11
             </button>
 
+            <button
+              className={`live-btn${blendOdds ? ' active' : ''}`}
+              onClick={() => setBlendOdds(v => !v)}
+              title="Blend Dixon-Coles (50%) with bookmaker implied probabilities (50%)"
+            >
+              + Bookmaker Odds
+            </button>
+
             <div className="filter-group team-filter">
               <label htmlFor="team-select">Team</label>
               <select
@@ -174,7 +183,7 @@ export default function App() {
         )}
 
         {visiblePredictions.map(p => (
-          <FixtureCard key={p.fixture.id} prediction={p} showTipp11={showTipp11} />
+          <FixtureCard key={p.fixture.id} prediction={p} showTipp11={showTipp11} blendOdds={blendOdds} />
         ))}
       </main>
     </div>

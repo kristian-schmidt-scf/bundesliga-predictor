@@ -1,6 +1,7 @@
 import ScoreHeatmap from './ScoreHeatmap'
 import OddsComparison from './OddsComparison'
 import Tipp11Heatmap from './Tipp11Heatmap'
+import { blendScoreMatrix, blendWinProbs } from '../utils/blendOdds'
 import './FixtureCard.css'
 
 function ProbBar({ label, value }) {
@@ -15,8 +16,16 @@ function ProbBar({ label, value }) {
   )
 }
 
-export default function FixtureCard({ prediction, showTipp11 }) {
+export default function FixtureCard({ prediction, showTipp11, blendOdds }) {
   const { fixture, win_probabilities, expected_home_goals, expected_away_goals, most_likely_score, score_matrix, odds, edge_home_win, edge_draw, edge_away_win } = prediction
+
+  const canBlend = blendOdds && odds?.implied_home_prob
+  const effectiveMatrix = canBlend
+    ? { ...score_matrix, matrix: blendScoreMatrix(score_matrix.matrix, win_probabilities, odds) }
+    : score_matrix
+  const effectiveWinProbs = canBlend
+    ? blendWinProbs(win_probabilities, odds)
+    : win_probabilities
   const { home_team, away_team, utc_date, status, home_score, away_score } = fixture
 
   const isFinished = status === 'FINISHED'
@@ -61,14 +70,14 @@ export default function FixtureCard({ prediction, showTipp11 }) {
       </div>
 
       <div className="prob-bars">
-        <ProbBar label={home_team.short_name} value={win_probabilities.home_win} />
-        <ProbBar label="Draw" value={win_probabilities.draw} />
-        <ProbBar label={away_team.short_name} value={win_probabilities.away_win} />
+        <ProbBar label={home_team.short_name} value={effectiveWinProbs.home_win} />
+        <ProbBar label="Draw" value={effectiveWinProbs.draw} />
+        <ProbBar label={away_team.short_name} value={effectiveWinProbs.away_win} />
       </div>
 
       <div className="card-lower">
-        <ScoreHeatmap matrix={score_matrix} actualScore={actualScore} />
-        {showTipp11 && <Tipp11Heatmap matrix={score_matrix} />}
+        <ScoreHeatmap matrix={effectiveMatrix} actualScore={actualScore} />
+        {showTipp11 && <Tipp11Heatmap matrix={effectiveMatrix} />}
         {odds && (
           <OddsComparison
             odds={odds}
