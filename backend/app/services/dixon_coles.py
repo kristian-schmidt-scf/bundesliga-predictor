@@ -6,8 +6,8 @@ and Inefficiencies in the Football Betting Market"
 
 Key ideas:
 - Each team has an attack (alpha) and defence (delta) strength parameter
-- A global home advantage (gamma) parameter
-- Expected goals: lambda_home = alpha_home * delta_away * gamma
+- A per-team home advantage (gamma_i) parameter
+- Expected goals: lambda_home = alpha_home * delta_away * gamma_home
                   mu_away    = alpha_away * delta_home
 - Low-score correction factor (tau) adjusts probabilities for 0-0, 1-0, 0-1, 1-1
 - Time decay weights recent matches more heavily (exponential decay)
@@ -81,15 +81,15 @@ def _neg_log_likelihood(
     n = len(teams)
     alphas = np.exp(params[:n])
     deltas = np.exp(params[n:2 * n])
-    gamma = np.exp(params[2 * n])
-    rho = params[2 * n + 1]
+    gammas = np.exp(params[2 * n:3 * n])
+    rho = params[3 * n]
 
     hi = np.array([team_idx[t] for t in data["home_team"]])
     ai = np.array([team_idx[t] for t in data["away_team"]])
     hg = data["home_goals"].values.astype(int)
     ag = data["away_goals"].values.astype(int)
 
-    lam = alphas[hi] * deltas[ai] * gamma
+    lam = alphas[hi] * deltas[ai] * gammas[hi]
     mu = alphas[ai] * deltas[hi]
 
     # Vectorized Poisson log-pmf: k*log(l) - l - log(k!)
@@ -129,7 +129,7 @@ class DixonColesModel:
         self.teams: list[str] = []
         self.alphas: dict[str, float] = {}
         self.deltas: dict[str, float] = {}
-        self.gamma: float = 1.0
+        self.gammas: dict[str, float] = {}
         self.rho: float = 0.0
         self.fitted: bool = False
         self._h2h_df: pd.DataFrame | None = None
@@ -162,8 +162,8 @@ class DixonColesModel:
         # Pre-compute team index lookup once
         team_idx = {t: i for i, t in enumerate(self.teams)}
 
-        # Initial params: all zeros in log-space (=> all strengths = 1)
-        x0 = np.zeros(2 * n + 2)
+        # Initial params: all zeros in log-space (=> all strengths = 1, gammas = 1)
+        x0 = np.zeros(3 * n + 1)
 
         result = minimize(
             _neg_log_likelihood,
@@ -179,16 +179,22 @@ class DixonColesModel:
         params = result.x
         alphas_raw = np.exp(params[:n])
         deltas_raw = np.exp(params[n:2 * n])
-        self.gamma = float(np.exp(params[2 * n]))
-        self.rho = float(params[2 * n + 1])
+        gammas_raw = np.exp(params[2 * n:3 * n])
+        self.rho = float(params[3 * n])
 
         self.alphas = {t: float(alphas_raw[i]) for i, t in enumerate(self.teams)}
         self.deltas = {t: float(deltas_raw[i]) for i, t in enumerate(self.teams)}
+        self.gammas = {t: float(gammas_raw[i]) for i, t in enumerate(self.teams)}
         self.fitted = True
 
+        avg_gamma = float(np.mean(gammas_raw))
+        min_t = min(self.gammas, key=self.gammas.get)
+        max_t = max(self.gammas, key=self.gammas.get)
         logger.info(
-            f"Model fitted. Home advantage (gamma): {self.gamma:.3f}, "
-            f"rho: {self.rho:.4f}"
+            f"Model fitted. rho: {self.rho:.4f} | "
+            f"avg home advantage: {avg_gamma:.3f} | "
+            f"lowest: {min_t} ({self.gammas[min_t]:.3f}) | "
+            f"highest: {max_t} ({self.gammas[max_t]:.3f})"
         )
 
     def _h2h_adjust(
@@ -198,26 +204,28 @@ class DixonColesModel:
         Bayesian shrinkage of lambda/mu toward H2H empirical goal averages.
 
         Combines same-order fixtures (home_team at home) and reversed fixtures
-        (away_team at home), normalising reversed goals by gamma to remove the
-        home-advantage signal before pooling. Time-decay weights are reused from
-        the fitting step so recent H2H matches count more.
+        (away_team at home), normalising reversed goals by each team's own gamma
+        to remove the home-advantage signal before pooling.
         """
         df = self._h2h_df
         w = self._h2h_weights
 
+        avg_gamma = float(np.mean(list(self.gammas.values())))
+        gamma_home = self.gammas.get(home_team, avg_gamma)
+        gamma_away = self.gammas.get(away_team, avg_gamma)
+
         same = (df["home_team"] == home_team) & (df["away_team"] == away_team)
         rev  = (df["home_team"] == away_team) & (df["away_team"] == home_team)
 
-        # Goals by home_team and away_team across all H2H encounters.
-        # Reversed fixtures: normalise away goals up (÷γ removes away penalty)
-        # and home goals down (÷γ removes home bonus) before pooling.
+        # Reversed fixtures: scale home_team's away goals up by their home gamma,
+        # and away_team's home goals down by their home gamma, before pooling.
         home_goals = np.concatenate([
             df.loc[same, "home_goals"].values.astype(float),
-            df.loc[rev,  "away_goals"].values.astype(float) * self.gamma,
+            df.loc[rev,  "away_goals"].values.astype(float) * gamma_home,
         ])
         away_goals = np.concatenate([
             df.loc[same, "away_goals"].values.astype(float),
-            df.loc[rev,  "home_goals"].values.astype(float) / self.gamma,
+            df.loc[rev,  "home_goals"].values.astype(float) / gamma_away,
         ])
         weights = np.concatenate([w[same.values], w[rev.values]])
 
@@ -246,16 +254,17 @@ class DixonColesModel:
         if not self.fitted:
             raise RuntimeError("Model has not been fitted yet.")
 
-        # Fall back to average strength for unknown teams
         avg_alpha = float(np.mean(list(self.alphas.values())))
         avg_delta = float(np.mean(list(self.deltas.values())))
+        avg_gamma = float(np.mean(list(self.gammas.values())))
 
         alpha_h = self.alphas.get(home_team, avg_alpha)
         delta_h = self.deltas.get(home_team, avg_delta)
         alpha_a = self.alphas.get(away_team, avg_alpha)
         delta_a = self.deltas.get(away_team, avg_delta)
+        gamma_h = self.gammas.get(home_team, avg_gamma)
 
-        lam_base = alpha_h * delta_a * self.gamma
+        lam_base = alpha_h * delta_a * gamma_h
         mu_base  = alpha_a * delta_h
         lam, mu = self._h2h_adjust(home_team, away_team, lam_base, mu_base)
 
