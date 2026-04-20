@@ -36,6 +36,7 @@ export default function App() {
   const [liveOnly, setLiveOnly] = useState(false)
   const [selectedTeam, setSelectedTeam] = useState('')
   const [favoriteTeam, setFavoriteTeam] = useState(() => localStorage.getItem('favTeam') ?? '')
+  const [showTipp11, setShowTipp11] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -132,6 +133,13 @@ export default function App() {
               Live{liveCount > 0 ? ` (${liveCount})` : ''}
             </button>
 
+            <button
+              className={`live-btn${showTipp11 ? ' active' : ''}`}
+              onClick={() => setShowTipp11(v => !v)}
+            >
+              Tipp 11
+            </button>
+
             <div className="filter-group team-filter">
               <label htmlFor="team-select">Team</label>
               <select
@@ -166,7 +174,7 @@ export default function App() {
         )}
 
         {visiblePredictions.map(p => (
-          <FixtureCard key={p.fixture.id} prediction={p} />
+          <FixtureCard key={p.fixture.id} prediction={p} showTipp11={showTipp11} />
         ))}
       </main>
     </div>

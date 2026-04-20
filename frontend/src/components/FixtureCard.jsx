@@ -1,5 +1,6 @@
 import ScoreHeatmap from './ScoreHeatmap'
 import OddsComparison from './OddsComparison'
+import Tipp11Heatmap from './Tipp11Heatmap'
 import './FixtureCard.css'
 
 function ProbBar({ label, value }) {
@@ -14,7 +15,7 @@ function ProbBar({ label, value }) {
   )
 }
 
-export default function FixtureCard({ prediction }) {
+export default function FixtureCard({ prediction, showTipp11 }) {
   const { fixture, win_probabilities, expected_home_goals, expected_away_goals, most_likely_score, score_matrix, odds, edge_home_win, edge_draw, edge_away_win } = prediction
   const { home_team, away_team, utc_date, status, home_score, away_score } = fixture
 
@@ -67,6 +68,7 @@ export default function FixtureCard({ prediction }) {
 
       <div className="card-lower">
         <ScoreHeatmap matrix={score_matrix} actualScore={actualScore} />
+        {showTipp11 && <Tipp11Heatmap matrix={score_matrix} />}
         {odds && (
           <OddsComparison
             odds={odds}

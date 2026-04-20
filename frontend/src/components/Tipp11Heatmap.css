@@ -1,0 +1,76 @@
+.tipp11-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.65rem;
+}
+
+.tipp11-title {
+  font-weight: 600;
+  color: #ccc;
+  font-size: 0.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.tipp11-best {
+  color: #6dbe6d;
+  font-weight: 700;
+  font-size: 0.68rem;
+}
+
+.tipp11-away-label {
+  text-align: center;
+  color: #888;
+  font-size: 0.65rem;
+}
+
+.tipp11-body {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+}
+
+.tipp11-home-label {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  color: #888;
+  font-size: 0.65rem;
+  white-space: nowrap;
+}
+
+.tipp11-grid {
+  display: grid;
+  gap: 2px;
+}
+
+.tipp11-cell {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  font-size: 0.55rem;
+}
+
+.tipp11-cell.header {
+  color: #777;
+  font-weight: 600;
+  background: transparent;
+}
+
+.tipp11-cell.corner {
+  background: transparent;
+}
+
+.tipp11-cell.data {
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 500;
+}
+
+.tipp11-cell.data.best {
+  outline: 2px solid rgba(109, 190, 109, 0.9);
+  outline-offset: -2px;
+}
