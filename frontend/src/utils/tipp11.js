@@ -35,3 +35,12 @@ export function computeTipp11Matrix(grid) {
     })
   )
 }
+
+export function bestTipp11Tip(grid) {
+  const matrix = computeTipp11Matrix(grid)
+  let best = { h: 0, a: 0, pts: -1 }
+  matrix.forEach((row, h) =>
+    row.forEach((pts, a) => { if (pts > best.pts) best = { h, a, pts } })
+  )
+  return best
+}

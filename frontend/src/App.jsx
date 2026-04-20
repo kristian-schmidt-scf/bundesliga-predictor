@@ -1,6 +1,8 @@
 import { useEffect, useState, useMemo } from 'react'
 import axios from 'axios'
 import FixtureCard from './components/FixtureCard'
+import { blendScoreMatrix } from './utils/blendOdds'
+import { bestTipp11Tip } from './utils/tipp11'
 import './App.css'
 
 const LIVE_STATUSES = new Set(['IN_PLAY', 'PAUSED', 'LIVE'])
@@ -30,11 +32,17 @@ function MatchupSidebar({ predictions, onSelect }) {
   return (
     <aside className="matchup-sidebar">
       {predictions.map(p => {
-        const { fixture } = p
+        const { fixture, score_matrix, win_probabilities, odds } = p
         const { home_team, away_team, status, home_score, away_score } = fixture
         const isLive = LIVE_STATUSES.has(status)
         const isFinished = status === 'FINISHED'
         const hasScore = home_score != null && away_score != null
+
+        const blendedGrid = odds?.implied_home_prob
+          ? blendScoreMatrix(score_matrix.matrix, win_probabilities, odds)
+          : score_matrix.matrix
+        const { h, a, pts } = bestTipp11Tip(blendedGrid)
+
         return (
           <button
             key={fixture.id}
@@ -53,6 +61,7 @@ function MatchupSidebar({ predictions, onSelect }) {
               <span>{away_team.short_name}</span>
               {away_team.crest_url && <img src={away_team.crest_url} className="si-crest" alt="" />}
             </span>
+            <span className="si-tip">{h}:{a} <span className="si-tip-pts">({pts.toFixed(1)}pt)</span></span>
           </button>
         )
       })}
