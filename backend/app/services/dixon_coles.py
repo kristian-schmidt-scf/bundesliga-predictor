@@ -119,6 +119,11 @@ def _neg_log_likelihood(
 # Model fitting
 # ---------------------------------------------------------------------------
 
+# Shrinkage constant for H2H adjustment: higher = more weight on base model.
+# At k=5, a single recent H2H match shifts lambda by ~17%; five matches by ~50%.
+H2H_K = 5.0
+
+
 class DixonColesModel:
     def __init__(self):
         self.teams: list[str] = []
@@ -127,6 +132,8 @@ class DixonColesModel:
         self.gamma: float = 1.0
         self.rho: float = 0.0
         self.fitted: bool = False
+        self._h2h_df: pd.DataFrame | None = None
+        self._h2h_weights: np.ndarray | None = None
 
     def fit(self, results: list[dict]) -> None:
         """
@@ -147,6 +154,10 @@ class DixonColesModel:
             df["date"].tolist(),
             settings.time_decay_half_life_days,
         )
+
+        # Store for H2H lookup at prediction time
+        self._h2h_df = df.reset_index(drop=True)
+        self._h2h_weights = weights
 
         # Pre-compute team index lookup once
         team_idx = {t: i for i, t in enumerate(self.teams)}
@@ -180,6 +191,53 @@ class DixonColesModel:
             f"rho: {self.rho:.4f}"
         )
 
+    def _h2h_adjust(
+        self, home_team: str, away_team: str, lam_base: float, mu_base: float
+    ) -> tuple[float, float]:
+        """
+        Bayesian shrinkage of lambda/mu toward H2H empirical goal averages.
+
+        Combines same-order fixtures (home_team at home) and reversed fixtures
+        (away_team at home), normalising reversed goals by gamma to remove the
+        home-advantage signal before pooling. Time-decay weights are reused from
+        the fitting step so recent H2H matches count more.
+        """
+        df = self._h2h_df
+        w = self._h2h_weights
+
+        same = (df["home_team"] == home_team) & (df["away_team"] == away_team)
+        rev  = (df["home_team"] == away_team) & (df["away_team"] == home_team)
+
+        # Goals by home_team and away_team across all H2H encounters.
+        # Reversed fixtures: normalise away goals up (÷γ removes away penalty)
+        # and home goals down (÷γ removes home bonus) before pooling.
+        home_goals = np.concatenate([
+            df.loc[same, "home_goals"].values.astype(float),
+            df.loc[rev,  "away_goals"].values.astype(float) * self.gamma,
+        ])
+        away_goals = np.concatenate([
+            df.loc[same, "away_goals"].values.astype(float),
+            df.loc[rev,  "home_goals"].values.astype(float) / self.gamma,
+        ])
+        weights = np.concatenate([w[same.values], w[rev.values]])
+
+        if len(weights) == 0:
+            return lam_base, mu_base
+
+        total_w = weights.sum()
+        h2h_lam = float(np.dot(weights, home_goals) / total_w)
+        h2h_mu  = float(np.dot(weights, away_goals) / total_w)
+
+        lam_adj = (H2H_K * lam_base + total_w * h2h_lam) / (H2H_K + total_w)
+        mu_adj  = (H2H_K * mu_base  + total_w * h2h_mu)  / (H2H_K + total_w)
+
+        logger.debug(
+            f"H2H {home_team} vs {away_team}: {int(same.sum())} same, "
+            f"{int(rev.sum())} reversed. "
+            f"λ {lam_base:.3f}→{lam_adj:.3f}, μ {mu_base:.3f}→{mu_adj:.3f}"
+        )
+        return lam_adj, mu_adj
+
     def predict(self, home_team: str, away_team: str) -> dict:
         """
         Predict score distribution for a fixture.
@@ -197,8 +255,9 @@ class DixonColesModel:
         alpha_a = self.alphas.get(away_team, avg_alpha)
         delta_a = self.deltas.get(away_team, avg_delta)
 
-        lam = alpha_h * delta_a * self.gamma
-        mu = alpha_a * delta_h
+        lam_base = alpha_h * delta_a * self.gamma
+        mu_base  = alpha_a * delta_h
+        lam, mu = self._h2h_adjust(home_team, away_team, lam_base, mu_base)
 
         # Build score probability matrix
         score_matrix = np.zeros((MAX_GOALS + 1, MAX_GOALS + 1))
