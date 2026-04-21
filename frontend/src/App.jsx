@@ -5,6 +5,54 @@ import { blendScoreMatrix } from './utils/blendOdds'
 import { bestTipp11Tip } from './utils/tipp11'
 import './App.css'
 
+function SoccerBallIcon() {
+  return (
+    <svg className="header-svg" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="50" cy="50" r="44" stroke="currentColor" strokeWidth="2.5" opacity="0.5" />
+      <polygon points="50,28 64,38 59,54 41,54 36,38" stroke="currentColor" strokeWidth="2" opacity="0.7" fill="currentColor" fillOpacity="0.08" />
+      <line x1="50" y1="28" x2="50" y2="6"  stroke="currentColor" strokeWidth="1.5" opacity="0.4" />
+      <line x1="64" y1="38" x2="84" y2="25" stroke="currentColor" strokeWidth="1.5" opacity="0.4" />
+      <line x1="59" y1="54" x2="76" y2="69" stroke="currentColor" strokeWidth="1.5" opacity="0.4" />
+      <line x1="41" y1="54" x2="24" y2="69" stroke="currentColor" strokeWidth="1.5" opacity="0.4" />
+      <line x1="36" y1="38" x2="16" y2="25" stroke="currentColor" strokeWidth="1.5" opacity="0.4" />
+    </svg>
+  )
+}
+
+function ScatterIcon() {
+  return (
+    <svg className="header-svg" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <line x1="12" y1="88" x2="88" y2="88" stroke="currentColor" strokeWidth="2" opacity="0.3" strokeLinecap="round" />
+      <line x1="12" y1="88" x2="12" y2="12" stroke="currentColor" strokeWidth="2" opacity="0.3" strokeLinecap="round" />
+      <line x1="18" y1="75" x2="82" y2="18" stroke="#6c63ff" strokeWidth="2" opacity="0.5" strokeLinecap="round" strokeDasharray="4 3" />
+      <circle cx="22" cy="72" r="4" fill="#4caf50" opacity="0.85" />
+      <circle cx="34" cy="60" r="4" fill="#4caf50" opacity="0.85" />
+      <circle cx="44" cy="52" r="4" fill="#4caf50" opacity="0.85" />
+      <circle cx="56" cy="40" r="4" fill="#4caf50" opacity="0.85" />
+      <circle cx="68" cy="30" r="4" fill="#4caf50" opacity="0.85" />
+      <circle cx="30" cy="50" r="3.5" fill="#e8000f" opacity="0.7" />
+      <circle cx="52" cy="64" r="3.5" fill="#e8000f" opacity="0.7" />
+      <circle cx="74" cy="44" r="3.5" fill="#6c63ff" opacity="0.7" />
+    </svg>
+  )
+}
+
+function AppHeader() {
+  return (
+    <header className="app-header">
+      <div className="header-banner">
+        <div className="header-icon"><SoccerBallIcon /></div>
+        <div className="header-center">
+          <div className="header-flag-stripe" />
+          <h1 className="header-title">Bundesliga Predictor</h1>
+          <p className="header-subtitle">Dixon-Coles model &nbsp;·&nbsp; Bookmaker edge &nbsp;·&nbsp; Tipp 11</p>
+        </div>
+        <div className="header-icon"><ScatterIcon /></div>
+      </div>
+    </header>
+  )
+}
+
 const LIVE_STATUSES = new Set(['IN_PLAY', 'PAUSED', 'LIVE'])
 
 function groupByMatchday(predictions) {
@@ -145,10 +193,7 @@ export default function App() {
 
   return (
     <div className="app">
-      <header className="app-header">
-        <h1>Bundesliga Predictor</h1>
-        <p className="subtitle">Dixon-Coles model vs bookmaker odds</p>
-      </header>
+      <AppHeader />
 
       <div className="app-body">
         {visiblePredictions.length > 0 && (
