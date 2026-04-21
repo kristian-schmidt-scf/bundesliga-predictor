@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react'
 import axios from 'axios'
 import FixtureCard from './components/FixtureCard'
 import LeagueTable from './components/LeagueTable'
+import AccuracySummary from './components/AccuracySummary'
 import { blendScoreMatrix } from './utils/blendOdds'
 import { bestTipp11Tip } from './utils/tipp11'
 import './App.css'
@@ -278,6 +279,8 @@ export default function App() {
               </div>
             </div>
           )}
+
+          {!showTable && <AccuracySummary predictions={visiblePredictions} />}
 
           {showTable ? (
             <LeagueTable />
