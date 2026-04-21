@@ -68,10 +68,12 @@ function groupByMatchday(predictions) {
     .map(([matchday, fixtures]) => ({ matchday: Number(matchday), fixtures }))
 }
 
+const UPCOMING_STATUSES = new Set(['SCHEDULED', 'TIMED'])
+
 function defaultMatchday(groups) {
   const live = groups.find(g => g.fixtures.some(p => LIVE_STATUSES.has(p.fixture.status)))
   if (live) return live.matchday
-  const upcoming = groups.find(g => g.fixtures.some(p => p.fixture.status === 'SCHEDULED'))
+  const upcoming = groups.find(g => g.fixtures.some(p => UPCOMING_STATUSES.has(p.fixture.status)))
   if (upcoming) return upcoming.matchday
   const finished = groups.filter(g => g.fixtures.every(p => p.fixture.status === 'FINISHED'))
   return finished.length > 0 ? finished[finished.length - 1].matchday : groups[0]?.matchday
