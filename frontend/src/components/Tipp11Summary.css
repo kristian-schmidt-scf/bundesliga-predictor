@@ -53,7 +53,6 @@
 }
 
 .t11s-table tbody tr:last-child td { border-bottom: none; }
-.t11s-table tbody tr.finished td { color: #ccc; }
 
 .t11s-fixture { text-align: left; white-space: nowrap; }
 
@@ -64,11 +63,14 @@
 
 .t11s-xpts { color: #6c63ff; }
 
-/* Actual points colour coding */
-.pts-high { color: #4caf50; font-weight: 700; }
-.pts-mid  { color: #f5c518; }
-.pts-low  { color: #ef5350; }
-.pts-none { color: #555; }
+.t11s-result { color: #888; }
+.t11s-dash   { color: #444; }
+
+/* Actual points colour coding — qualified to beat row-level rules */
+.t11s-table .pts-high { color: #4caf50; font-weight: 700; }
+.t11s-table .pts-mid  { color: #f5c518; }
+.t11s-table .pts-low  { color: #ef5350; }
+.t11s-table .pts-none { color: #555; }
 
 .t11s-total td {
   border-top: 1px solid #252545;

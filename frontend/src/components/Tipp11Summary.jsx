@@ -20,7 +20,7 @@ export default function Tipp11Summary({ predictions, useBlend }) {
       ? computePoints(h, a, home_score, away_score)
       : null
 
-    return { home_team, away_team, h, a, expectedPts, actualPts, isFinished }
+    return { home_team, away_team, h, a, expectedPts, actualPts, isFinished, home_score, away_score }
   })
 
   const totalExpected = rows.reduce((s, r) => s + r.expectedPts, 0)
@@ -28,6 +28,9 @@ export default function Tipp11Summary({ predictions, useBlend }) {
   const totalActual = finishedRows.length > 0
     ? finishedRows.reduce((s, r) => s + r.actualPts, 0)
     : null
+
+  const showResultCol = finishedRows.length > 0
+  const showActualCol = finishedRows.length > 0
 
   return (
     <div className="t11s-wrapper">
@@ -40,20 +43,26 @@ export default function Tipp11Summary({ predictions, useBlend }) {
           <tr>
             <th>Fixture</th>
             <th>Best tip</th>
+            {showResultCol && <th>Result</th>}
             <th>xPts</th>
-            {finishedRows.length > 0 && <th>Actual pts</th>}
+            {showActualCol && <th>Pts</th>}
           </tr>
         </thead>
         <tbody>
           {rows.map((r, i) => (
-            <tr key={i} className={r.isFinished ? 'finished' : ''}>
+            <tr key={i}>
               <td className="t11s-fixture">
                 {r.home_team.short_name} – {r.away_team.short_name}
               </td>
               <td className="t11s-tip">{r.h}:{r.a}</td>
+              {showResultCol && (
+                <td className="t11s-result">
+                  {r.isFinished ? `${r.home_score}–${r.away_score}` : '–'}
+                </td>
+              )}
               <td className="t11s-xpts">{r.expectedPts.toFixed(1)}</td>
-              {finishedRows.length > 0 && (
-                <td className={`t11s-actual${r.isFinished ? ` pts-${scoreClass(r.actualPts)}` : ''}`}>
+              {showActualCol && (
+                <td className={r.isFinished ? `pts-${scoreClass(r.actualPts)}` : 't11s-dash'}>
                   {r.isFinished ? r.actualPts : '–'}
                 </td>
               )}
@@ -64,9 +73,10 @@ export default function Tipp11Summary({ predictions, useBlend }) {
           <tr className="t11s-total">
             <td>Total</td>
             <td />
+            {showResultCol && <td />}
             <td className="t11s-xpts">{totalExpected.toFixed(1)}</td>
-            {finishedRows.length > 0 && (
-              <td className={`t11s-actual pts-${scoreClass(totalActual)}`}>
+            {showActualCol && (
+              <td className={totalActual !== null ? `pts-${scoreClass(totalActual)}` : 't11s-dash'}>
                 {totalActual !== null ? totalActual : '–'}
               </td>
             )}
