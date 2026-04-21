@@ -1,0 +1,81 @@
+.t11s-wrapper {
+  background: #1a1a2e;
+  border: 1px solid #252545;
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.t11s-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.6rem;
+}
+
+.t11s-title {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #555;
+}
+
+.t11s-hint {
+  font-size: 0.62rem;
+  color: #444;
+}
+
+.t11s-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.t11s-table th {
+  color: #555;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.25rem 0.5rem;
+  border-bottom: 1px solid #1e1e3a;
+  text-align: right;
+}
+
+.t11s-table th:first-child { text-align: left; }
+
+.t11s-table td {
+  padding: 0.3rem 0.5rem;
+  border-bottom: 1px solid #14142a;
+  color: #aaa;
+  text-align: right;
+}
+
+.t11s-table tbody tr:last-child td { border-bottom: none; }
+.t11s-table tbody tr.finished td { color: #ccc; }
+
+.t11s-fixture { text-align: left; white-space: nowrap; }
+
+.t11s-tip {
+  font-weight: 700;
+  color: #6dbe6d;
+}
+
+.t11s-xpts { color: #6c63ff; }
+
+/* Actual points colour coding */
+.pts-high { color: #4caf50; font-weight: 700; }
+.pts-mid  { color: #f5c518; }
+.pts-low  { color: #ef5350; }
+.pts-none { color: #555; }
+
+.t11s-total td {
+  border-top: 1px solid #252545;
+  border-bottom: none;
+  font-weight: 700;
+  color: #e0e0ff;
+  padding-top: 0.4rem;
+}
+
+.t11s-total .t11s-xpts { color: #6c63ff; }

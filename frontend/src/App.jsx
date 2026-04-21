@@ -3,6 +3,7 @@ import axios from 'axios'
 import FixtureCard from './components/FixtureCard'
 import LeagueTable from './components/LeagueTable'
 import AccuracySummary from './components/AccuracySummary'
+import Tipp11Summary from './components/Tipp11Summary'
 import { blendScoreMatrix } from './utils/blendOdds'
 import { bestTipp11Tip } from './utils/tipp11'
 import './App.css'
@@ -281,6 +282,9 @@ export default function App() {
           )}
 
           {!showTable && <AccuracySummary predictions={visiblePredictions} />}
+          {!showTable && showTipp11 && (
+            <Tipp11Summary predictions={visiblePredictions} useBlend={blendOdds} />
+          )}
 
           {showTable ? (
             <LeagueTable />

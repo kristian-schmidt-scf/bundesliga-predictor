@@ -4,7 +4,7 @@ function tendency(home, away) {
   return 'D'
 }
 
-function computePoints(hTip, aTip, hActual, aActual) {
+export function computePoints(hTip, aTip, hActual, aActual) {
   const tendencyCorrect = tendency(hTip, aTip) === tendency(hActual, aActual)
   let pts = 0
 
