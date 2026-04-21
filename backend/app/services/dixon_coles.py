@@ -123,6 +123,12 @@ def _neg_log_likelihood(
 # At k=5, a single recent H2H match shifts lambda by ~17%; five matches by ~50%.
 H2H_K = 5.0
 
+# Recent form settings.
+# FORM_N_GAMES: how many recent matches to consider.
+# FORM_KAPPA: dampening exponent — at 0.1 a team with 2× avg PPG gets a ~7% boost.
+FORM_N_GAMES = 5
+FORM_KAPPA = 0.1
+
 
 class DixonColesModel:
     def __init__(self):
@@ -131,6 +137,7 @@ class DixonColesModel:
         self.deltas: dict[str, float] = {}
         self.gammas: dict[str, float] = {}
         self.rho: float = 0.0
+        self.form: dict[str, float] = {}   # team -> form factor (centred around 1.0)
         self.fitted: bool = False
         self._h2h_df: pd.DataFrame | None = None
         self._h2h_weights: np.ndarray | None = None
@@ -190,12 +197,48 @@ class DixonColesModel:
         avg_gamma = float(np.mean(gammas_raw))
         min_t = min(self.gammas, key=self.gammas.get)
         max_t = max(self.gammas, key=self.gammas.get)
+
+        self.form = self._compute_form(df)
+        hot   = max(self.form, key=self.form.get)
+        cold  = min(self.form, key=self.form.get)
+
         logger.info(
             f"Model fitted. rho: {self.rho:.4f} | "
             f"avg home advantage: {avg_gamma:.3f} | "
-            f"lowest: {min_t} ({self.gammas[min_t]:.3f}) | "
-            f"highest: {max_t} ({self.gammas[max_t]:.3f})"
+            f"lowest γ: {min_t} ({self.gammas[min_t]:.3f}) | "
+            f"highest γ: {max_t} ({self.gammas[max_t]:.3f}) | "
+            f"hottest form: {hot} ({self.form[hot]:.3f}) | "
+            f"coldest form: {cold} ({self.form[cold]:.3f})"
         )
+
+    def _compute_form(self, df: pd.DataFrame) -> dict[str, float]:
+        """
+        Compute a form factor for each team based on their last FORM_N_GAMES results.
+        Returns a dict of team -> factor centred around 1.0 (above = good form).
+        """
+        teams = set(df["home_team"]) | set(df["away_team"])
+        ppg: dict[str, float] = {}
+
+        for team in teams:
+            mask = (df["home_team"] == team) | (df["away_team"] == team)
+            recent = df[mask].sort_values("date", ascending=False).head(FORM_N_GAMES)
+
+            pts = []
+            for _, row in recent.iterrows():
+                hg, ag = int(row["home_goals"]), int(row["away_goals"])
+                if row["home_team"] == team:
+                    pts.append(3 if hg > ag else 1 if hg == ag else 0)
+                else:
+                    pts.append(3 if ag > hg else 1 if ag == hg else 0)
+
+            ppg[team] = float(np.mean(pts)) if pts else 1.5
+
+        avg_ppg = float(np.mean(list(ppg.values())))
+        # Avoid division by zero; centre factor at 1.0
+        return {
+            t: (ppg[t] / avg_ppg) ** FORM_KAPPA if avg_ppg > 0 else 1.0
+            for t in teams
+        }
 
     def _h2h_adjust(
         self, home_team: str, away_team: str, lam_base: float, mu_base: float
@@ -264,9 +307,16 @@ class DixonColesModel:
         delta_a = self.deltas.get(away_team, avg_delta)
         gamma_h = self.gammas.get(home_team, avg_gamma)
 
+        avg_form = float(np.mean(list(self.form.values()))) if self.form else 1.0
+        form_h = self.form.get(home_team, avg_form)
+        form_a = self.form.get(away_team, avg_form)
+
         lam_base = alpha_h * delta_a * gamma_h
         mu_base  = alpha_a * delta_h
         lam, mu = self._h2h_adjust(home_team, away_team, lam_base, mu_base)
+
+        lam *= form_h
+        mu  *= form_a
 
         # Build score probability matrix
         score_matrix = np.zeros((MAX_GOALS + 1, MAX_GOALS + 1))
