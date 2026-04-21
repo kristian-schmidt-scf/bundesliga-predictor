@@ -28,7 +28,7 @@ class Settings(BaseSettings):
 
     # Dixon-Coles model settings
     # Number of past seasons of data to fit the model on
-    seasons_to_fetch: int = 5
+    seasons_to_fetch: int = 3
     # Time decay half-life in days (recent matches weighted more)
     time_decay_half_life_days: int = 90
 
