@@ -125,6 +125,37 @@ async def get_current_season_results() -> list[dict]:
     return results
 
 
+async def get_standings() -> list[dict]:
+    """Fetch current Bundesliga standings."""
+    url = f"{settings.football_data_base_url}/competitions/{settings.bundesliga_competition_code}/standings"
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(url, headers=HEADERS, timeout=10)
+        resp.raise_for_status()
+
+    data = resp.json()
+    table = data["standings"][0]["table"]  # [0] = overall standings
+    return [
+        {
+            "position": row["position"],
+            "team_id": row["team"]["id"],
+            "team_name": row["team"]["name"],
+            "team_short_name": row["team"].get("shortName", row["team"]["name"]),
+            "team_crest": row["team"].get("crest"),
+            "played": row["playedGames"],
+            "won": row["won"],
+            "draw": row["draw"],
+            "lost": row["lost"],
+            "goals_for": row["goalsFor"],
+            "goals_against": row["goalsAgainst"],
+            "goal_difference": row["goalDifference"],
+            "points": row["points"],
+            "form": row.get("form", ""),
+        }
+        for row in table
+    ]
+
+
 def _parse_fixture(match: dict) -> Fixture:
     home = match["homeTeam"]
     away = match["awayTeam"]

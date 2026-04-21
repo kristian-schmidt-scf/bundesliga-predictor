@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import axios from 'axios'
 import FixtureCard from './components/FixtureCard'
+import LeagueTable from './components/LeagueTable'
 import { blendScoreMatrix } from './utils/blendOdds'
 import { bestTipp11Tip } from './utils/tipp11'
 import './App.css'
@@ -126,6 +127,7 @@ export default function App() {
   const [favoriteTeam, setFavoriteTeam] = useState(() => localStorage.getItem('favTeam') ?? '')
   const [showTipp11, setShowTipp11] = useState(false)
   const [blendOdds, setBlendOdds] = useState(false)
+  const [showTable, setShowTable] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -196,7 +198,7 @@ export default function App() {
       <AppHeader />
 
       <div className="app-body">
-        {visiblePredictions.length > 0 && (
+        {visiblePredictions.length > 0 && !showTable && (
           <MatchupSidebar predictions={visiblePredictions} onSelect={scrollToFixture} />
         )}
 
@@ -243,6 +245,13 @@ export default function App() {
                 + Bookmaker Odds
               </button>
 
+              <button
+                className={`live-btn${showTable ? ' active' : ''}`}
+                onClick={() => setShowTable(v => !v)}
+              >
+                Table
+              </button>
+
               <div className="filter-group team-filter">
                 <label htmlFor="team-select">Team</label>
                 <select
@@ -270,19 +279,24 @@ export default function App() {
             </div>
           )}
 
-          {visiblePredictions.length === 0 && !loading && (
-            <div className="status">
-              {liveOnly ? 'No games currently live.' : 'No fixtures to show.'}
-            </div>
-          )}
-
-          <div className="fixture-list">
-            {visiblePredictions.map(p => (
-              <div key={p.fixture.id} id={`fixture-${p.fixture.id}`}>
-                <FixtureCard prediction={p} showTipp11={showTipp11} blendOdds={blendOdds} />
+          {showTable ? (
+            <LeagueTable />
+          ) : (
+            <>
+              {visiblePredictions.length === 0 && !loading && (
+                <div className="status">
+                  {liveOnly ? 'No games currently live.' : 'No fixtures to show.'}
+                </div>
+              )}
+              <div className="fixture-list">
+                {visiblePredictions.map(p => (
+                  <div key={p.fixture.id} id={`fixture-${p.fixture.id}`}>
+                    <FixtureCard prediction={p} showTipp11={showTipp11} blendOdds={blendOdds} />
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </>
+          )}
         </div>
       </div>
     </div>

@@ -61,6 +61,22 @@ class WinProbabilities(BaseModel):
     away_win: float
 
 
+class TableEntry(BaseModel):
+    position: int
+    team: Team
+    played: int
+    won: int
+    draw: int
+    lost: int
+    goals_for: int
+    goals_against: int
+    goal_difference: int
+    points: int
+    form: Optional[str] = None
+    expected_pts_remaining: float = 0.0
+    projected_total: float = 0.0
+
+
 class Prediction(BaseModel):
     fixture: Fixture
     score_matrix: ScoreMatrix

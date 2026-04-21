@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 
-from app.routers import fixtures, predictions
+from app.routers import fixtures, predictions, table
 from app.services.dixon_coles import get_model
 from app.services.football_data import get_historical_results, get_current_season_results
 from app.config import settings
@@ -56,6 +56,7 @@ app.add_middleware(
 
 app.include_router(fixtures.router, prefix="/api")
 app.include_router(predictions.router, prefix="/api")
+app.include_router(table.router, prefix="/api")
 
 
 @app.get("/api/health")
