@@ -140,8 +140,6 @@ export default function App() {
         const g = groupByMatchday(preds)
         setAllPredictions(preds)
         setGroups(g)
-        const favTeam = localStorage.getItem('favTeam') ?? ''
-        setSelectedTeam(favTeam)
         setSelectedMatchday(defaultMatchday(g))
       })
       .catch(err => setError(err.message))
