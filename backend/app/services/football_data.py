@@ -41,7 +41,7 @@ async def get_current_and_upcoming_fixtures() -> list[Fixture]:
     """
     from datetime import timedelta
     now = datetime.now(timezone.utc)
-    date_from = (now - timedelta(days=14)).strftime("%Y-%m-%d")
+    date_from = f"{now.year}-01-01"
     date_to = (now + timedelta(days=60)).strftime("%Y-%m-%d")
 
     url = f"{settings.football_data_base_url}/competitions/{settings.bundesliga_competition_code}/matches"
