@@ -82,7 +82,7 @@ function defaultMatchday(groups) {
   return finished.length > 0 ? finished[finished.length - 1].matchday : groups[0]?.matchday
 }
 
-function MatchupSidebar({ predictions, onSelect }) {
+function MatchupSidebar({ predictions, onSelect, blendOdds }) {
   return (
     <aside className="matchup-sidebar">
       {predictions.map(p => {
@@ -92,10 +92,10 @@ function MatchupSidebar({ predictions, onSelect }) {
         const isFinished = status === 'FINISHED'
         const hasScore = home_score != null && away_score != null
 
-        const blendedGrid = odds?.implied_home_prob
+        const grid = (blendOdds && odds?.implied_home_prob)
           ? blendScoreMatrix(score_matrix.matrix, win_probabilities, odds)
           : score_matrix.matrix
-        const { h, a, pts } = bestTipp11Tip(blendedGrid)
+        const { h, a, pts } = bestTipp11Tip(grid)
 
         return (
           <button
@@ -203,7 +203,7 @@ export default function App() {
 
       <div className={`app-body${showTable || showCalibration ? ' no-sidebar' : ''}`}>
         {visiblePredictions.length > 0 && !showTable && !showCalibration && (
-          <MatchupSidebar predictions={visiblePredictions} onSelect={scrollToFixture} />
+          <MatchupSidebar predictions={visiblePredictions} onSelect={scrollToFixture} blendOdds={blendOdds} />
         )}
 
         <div className="content-column">
