@@ -4,6 +4,7 @@ import FixtureCard from './components/FixtureCard'
 import LeagueTable from './components/LeagueTable'
 import AccuracySummary from './components/AccuracySummary'
 import Tipp11Summary from './components/Tipp11Summary'
+import CalibrationView from './components/CalibrationView'
 import { blendScoreMatrix } from './utils/blendOdds'
 import { bestTipp11Tip } from './utils/tipp11'
 import './App.css'
@@ -132,6 +133,7 @@ export default function App() {
   const [showTipp11, setShowTipp11] = useState(false)
   const [blendOdds, setBlendOdds] = useState(false)
   const [showTable, setShowTable] = useState(false)
+  const [showCalibration, setShowCalibration] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -199,8 +201,8 @@ export default function App() {
     <div className="app">
       <AppHeader />
 
-      <div className="app-body">
-        {visiblePredictions.length > 0 && !showTable && (
+      <div className={`app-body${showTable || showCalibration ? ' no-sidebar' : ''}`}>
+        {visiblePredictions.length > 0 && !showTable && !showCalibration && (
           <MatchupSidebar predictions={visiblePredictions} onSelect={scrollToFixture} />
         )}
 
@@ -254,6 +256,13 @@ export default function App() {
                 Table
               </button>
 
+              <button
+                className={`live-btn${showCalibration ? ' active' : ''}`}
+                onClick={() => setShowCalibration(v => !v)}
+              >
+                Calibration
+              </button>
+
               <div className="filter-group team-filter">
                 <label htmlFor="team-select">Team</label>
                 <select
@@ -281,12 +290,14 @@ export default function App() {
             </div>
           )}
 
-          {!showTable && <AccuracySummary predictions={visiblePredictions} />}
-          {!showTable && showTipp11 && (
+          {!showTable && !showCalibration && <AccuracySummary predictions={visiblePredictions} />}
+          {!showTable && !showCalibration && showTipp11 && (
             <Tipp11Summary predictions={visiblePredictions} useBlend={blendOdds} />
           )}
 
-          {showTable ? (
+          {showCalibration ? (
+            <CalibrationView />
+          ) : showTable ? (
             <LeagueTable />
           ) : (
             <>

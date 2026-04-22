@@ -77,6 +77,10 @@
   align-items: start;
 }
 
+.app-body.no-sidebar {
+  grid-template-columns: 1fr;
+}
+
 /* ── Left sidebar ── */
 
 .matchup-sidebar {
