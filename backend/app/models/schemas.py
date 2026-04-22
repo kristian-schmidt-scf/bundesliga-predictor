@@ -61,6 +61,15 @@ class WinProbabilities(BaseModel):
     away_win: float
 
 
+class CalibrationVariant(BaseModel):
+    name: str
+    description: str
+    fixtures: int
+    brier_score: float
+    log_loss: float
+    tendency_accuracy: float
+
+
 class CalibrationMatchday(BaseModel):
     matchday: int
     fixtures: int
@@ -82,6 +91,7 @@ class CalibrationResult(BaseModel):
     brier_score: float
     log_loss: float
     tendency_accuracy: float
+    variants: list[CalibrationVariant]
     per_matchday: list[CalibrationMatchday]
     calibration_curve: list[CalibrationBucket]
 

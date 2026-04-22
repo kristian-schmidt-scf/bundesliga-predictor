@@ -208,5 +208,24 @@
 .cal-table td:first-child { text-align: left; color: #ccc; }
 .cal-table tbody tr:last-child td { border-bottom: none; }
 
-.good { color: #4caf50; }
-.bad  { color: #ef5350; }
+.cal-table td.good { color: #4caf50; }
+.cal-table td.bad  { color: #ef5350; }
+
+.cal-chart {
+  display: block;
+  width: 100%;
+  max-width: 600px;
+  margin-bottom: 1rem;
+}
+
+.cal-variants-table .cal-variant-name {
+  font-weight: 600;
+  color: #e0e0ff;
+  white-space: nowrap;
+}
+
+.cal-variants-table .cal-variant-desc {
+  color: #555;
+  font-size: 0.72rem;
+  text-align: left;
+}

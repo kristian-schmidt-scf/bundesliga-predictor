@@ -289,7 +289,14 @@ class DixonColesModel:
         )
         return lam_adj, mu_adj
 
-    def predict(self, home_team: str, away_team: str) -> dict:
+    def predict(
+        self,
+        home_team: str,
+        away_team: str,
+        use_team_gamma: bool = True,
+        use_h2h: bool = True,
+        use_form: bool = True,
+    ) -> dict:
         """
         Predict score distribution for a fixture.
         Returns score matrix, win probabilities, expected goals, most likely score.
@@ -305,15 +312,19 @@ class DixonColesModel:
         delta_h = self.deltas.get(home_team, avg_delta)
         alpha_a = self.alphas.get(away_team, avg_alpha)
         delta_a = self.deltas.get(away_team, avg_delta)
-        gamma_h = self.gammas.get(home_team, avg_gamma)
+        gamma_h = self.gammas.get(home_team, avg_gamma) if use_team_gamma else avg_gamma
 
         avg_form = float(np.mean(list(self.form.values()))) if self.form else 1.0
-        form_h = self.form.get(home_team, avg_form)
-        form_a = self.form.get(away_team, avg_form)
+        form_h = self.form.get(home_team, avg_form) if use_form else 1.0
+        form_a = self.form.get(away_team, avg_form) if use_form else 1.0
 
         lam_base = alpha_h * delta_a * gamma_h
         mu_base  = alpha_a * delta_h
-        lam, mu = self._h2h_adjust(home_team, away_team, lam_base, mu_base)
+
+        if use_h2h:
+            lam, mu = self._h2h_adjust(home_team, away_team, lam_base, mu_base)
+        else:
+            lam, mu = lam_base, mu_base
 
         lam *= form_h
         mu  *= form_a
