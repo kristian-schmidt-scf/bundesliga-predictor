@@ -8,8 +8,11 @@ from fastapi.middleware.cors import CORSMiddleware
 import logging
 
 from app.routers import fixtures, predictions, table, calibration
-from app.services.dixon_coles import get_model
-from app.services.football_data import get_historical_results, get_current_season_results
+from app.services.dixon_coles import get_model, get_model_bayes
+from app.services.football_data import (
+    get_historical_results, get_current_season_results, get_current_and_upcoming_fixtures
+)
+from app.services.odds import get_bundesliga_odds, find_odds_for_fixture
 from app.config import settings
 
 logging.basicConfig(level=logging.INFO)
@@ -19,21 +22,49 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
-    On startup: fetch historical data and fit the Dixon-Coles model.
-    This runs once when the server starts, so the first request is instant.
+    On startup: fetch historical data and fit both the base and Bayesian-prior models.
+    The Bayesian model uses current bookmaker odds as priors on attack/defence parameters.
     """
-    logger.info("=== Startup: fitting Dixon-Coles model ===")
+    logger.info("=== Startup: fitting Dixon-Coles models ===")
     try:
         historical = await get_historical_results(settings.seasons_to_fetch)
-        current = await get_current_season_results()
+        current    = await get_current_season_results()
         all_results = historical + current
 
+        # 1. Base model — no bookmaker prior
         model = get_model()
         model.fit(all_results)
-        logger.info("=== Model ready ===")
+        logger.info("=== Base model ready ===")
+
+        # 2. Bayesian model — use current bookmaker odds as MAP prior
+        logger.info("=== Startup: fitting Bayesian prior model ===")
+        try:
+            upcoming_fixtures = await get_current_and_upcoming_fixtures()
+            odds_map = await get_bundesliga_odds()
+
+            odds_list = []
+            for fixture in upcoming_fixtures:
+                home = fixture.home_team.name
+                away = fixture.away_team.name
+                match_odds = find_odds_for_fixture(odds_map, home, away)
+                if match_odds and match_odds.implied_home_prob:
+                    odds_list.append({
+                        "home_team": home,
+                        "away_team": away,
+                        "implied_home_prob": match_odds.implied_home_prob,
+                        "implied_draw_prob": match_odds.implied_draw_prob,
+                        "implied_away_prob": match_odds.implied_away_prob,
+                    })
+
+            model_bayes = get_model_bayes()
+            model_bayes.fit_with_prior(all_results, odds_list)
+            logger.info("=== Bayesian prior model ready ===")
+        except Exception as e:
+            logger.warning(f"Bayesian model fitting failed: {e} — Bayes predictions unavailable.")
+
     except Exception as e:
         logger.error(f"Model fitting failed on startup: {e}")
-        logger.warning("Server is running but predictions will be unavailable until model is fitted.")
+        logger.warning("Server is running but predictions may be unavailable.")
 
     yield  # server runs here
 
@@ -45,7 +76,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Allow the React dev server (port 5173) to call the API
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://localhost:3000"],
@@ -63,8 +93,10 @@ app.include_router(calibration.router, prefix="/api")
 @app.get("/api/health")
 async def health():
     model = get_model()
+    model_bayes = get_model_bayes()
     return {
         "status": "ok",
         "model_fitted": model.fitted,
+        "model_bayes_fitted": model_bayes.fitted,
         "teams_in_model": len(model.teams) if model.fitted else 0,
     }

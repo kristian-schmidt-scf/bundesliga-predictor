@@ -1,7 +1,8 @@
 import asyncio
 from fastapi import APIRouter, HTTPException
 from app.services import football_data, odds, prediction_cache
-from app.services.dixon_coles import get_model
+from app.services import prediction_cache_bayes
+from app.services.dixon_coles import get_model, get_model_bayes
 from app.models.schemas import Prediction, ScoreMatrix, WinProbabilities
 import logging
 
@@ -50,14 +51,15 @@ def _build_prediction(fixture, pred, match_odds) -> Prediction:
 
 
 @router.get("/upcoming", response_model=list[Prediction])
-async def get_predictions_for_upcoming_fixtures():
+async def get_predictions_for_upcoming_fixtures(model_variant: str = "base"):
     """
     Returns Dixon-Coles predictions for current and upcoming Bundesliga fixtures.
-    Includes finished/live games from the last 7 days so the current matchday
-    remains visible after kickoff. Predictions for live/finished games are served
-    from cache (frozen at the last pre-kickoff computation).
+    Use ?model_variant=bayes to serve from the Bayesian prior model.
+    Predictions for live/finished games are served from cache (frozen at kickoff).
     """
-    model = get_model()
+    use_bayes = model_variant == "bayes"
+    model = get_model_bayes() if use_bayes else get_model()
+    cache = prediction_cache_bayes if use_bayes else prediction_cache
     if not model.fitted:
         raise HTTPException(
             status_code=503,
@@ -78,9 +80,8 @@ async def get_predictions_for_upcoming_fixtures():
         # Serve from cache for live/finished games so the prediction is frozen
         # at the last pre-kickoff value. Fall through to compute if cache is cold.
         if is_settled:
-            cached = prediction_cache.get(fixture.id)
+            cached = cache.get(fixture.id)
             if cached:
-                # Update the fixture object so status reflects reality
                 predictions.append(cached.model_copy(update={"fixture": fixture}))
                 continue
 
@@ -93,7 +94,7 @@ async def get_predictions_for_upcoming_fixtures():
         match_odds = odds.find_odds_for_fixture(odds_map, home, away)
         prediction = _build_prediction(fixture, pred, match_odds)
 
-        prediction_cache.set(fixture.id, prediction)
+        cache.set(fixture.id, prediction)
         predictions.append(prediction)
 
     return predictions

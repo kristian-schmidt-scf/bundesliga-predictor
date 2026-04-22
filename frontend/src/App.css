@@ -288,6 +288,9 @@
   background: #1a2e1a;
 }
 
+.live-btn.model-toggle { border-color: #6c63ff; color: #6c63ff; }
+.live-btn.model-toggle.active { background: #1a1a3a; border-color: #9c8fff; color: #9c8fff; }
+
 .live-btn.disabled {
   opacity: 0.35;
   cursor: default;

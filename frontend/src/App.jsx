@@ -134,11 +134,12 @@ export default function App() {
   const [blendOdds, setBlendOdds] = useState(false)
   const [showTable, setShowTable] = useState(false)
   const [showCalibration, setShowCalibration] = useState(false)
+  const [modelVariant, setModelVariant] = useState('base')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    axios.get('/api/predictions/upcoming')
+    axios.get(`/api/predictions/upcoming?model_variant=${modelVariant}`)
       .then(res => {
         const preds = res.data
         const g = groupByMatchday(preds)
@@ -182,6 +183,23 @@ export default function App() {
 
     return preds
   }, [allPredictions, groups, selectedMatchday, liveOnly, selectedTeam])
+
+  useEffect(() => {
+    setAllPredictions([])
+    setGroups([])
+    setSelectedMatchday(null)
+    setLoading(true)
+    axios.get(`/api/predictions/upcoming?model_variant=${modelVariant}`)
+      .then(res => {
+        const preds = res.data
+        const g = groupByMatchday(preds)
+        setAllPredictions(preds)
+        setGroups(g)
+        setSelectedMatchday(defaultMatchday(g))
+      })
+      .catch(err => setError(err.message))
+      .finally(() => setLoading(false))
+  }, [modelVariant])
 
   function toggleFavorite() {
     if (favoriteTeam === selectedTeam) {
@@ -261,6 +279,14 @@ export default function App() {
                 onClick={() => setShowCalibration(v => !v)}
               >
                 Calibration
+              </button>
+
+              <button
+                className={`live-btn model-toggle${modelVariant === 'bayes' ? ' active' : ''}`}
+                onClick={() => setModelVariant(v => v === 'base' ? 'bayes' : 'base')}
+                title="Toggle between base Dixon-Coles and Bayesian prior model"
+              >
+                {modelVariant === 'bayes' ? 'Bayes Prior' : 'Base Model'}
               </button>
 
               <div className="filter-group team-filter">

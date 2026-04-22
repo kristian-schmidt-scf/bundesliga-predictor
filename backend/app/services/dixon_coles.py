@@ -196,6 +196,103 @@ def _neg_log_likelihood(
 
 
 # ---------------------------------------------------------------------------
+# Bayesian prior: market-implied goals from bookmaker odds
+# ---------------------------------------------------------------------------
+
+# L2 penalty weight on (log λ_pred − log λ_mkt)² + (log μ_pred − log μ_mkt)².
+# At 100, 9 upcoming fixtures contribute roughly as much as 2–3 historical matches.
+PRIOR_STRENGTH = 100.0
+
+
+def _market_implied_goals(
+    p_home: float, p_draw: float, p_away: float, max_goals: int = MAX_GOALS
+) -> tuple[float, float] | None:
+    """
+    Numerically solve for (λ, μ) whose Poisson score distribution best matches
+    the bookmaker's implied H/D/A probabilities.
+    Returns None if the optimisation fails to converge.
+    """
+    goals = np.arange(max_goals + 1)
+
+    def objective(log_lam_mu):
+        lam = math.exp(log_lam_mu[0])
+        mu  = math.exp(log_lam_mu[1])
+        p_i = np.array([poisson.pmf(k, lam) for k in goals])
+        p_j = np.array([poisson.pmf(k, mu)  for k in goals])
+        matrix = np.outer(p_i, p_j)
+        pred_h = float(np.sum(np.tril(matrix, -1)))
+        pred_d = float(np.trace(matrix))
+        pred_a = float(np.sum(np.triu(matrix, 1)))
+        return (pred_h - p_home) ** 2 + (pred_d - p_draw) ** 2 + (pred_a - p_away) ** 2
+
+    result = minimize(
+        objective,
+        x0=[np.log(1.4), np.log(1.1)],
+        method="Nelder-Mead",
+        options={"xatol": 1e-6, "fatol": 1e-8, "maxiter": 2000},
+    )
+    if not result.success and result.fun > 1e-4:
+        return None
+    lam, mu = math.exp(result.x[0]), math.exp(result.x[1])
+    if lam <= 0 or mu <= 0:
+        return None
+    return lam, mu
+
+
+def _neg_log_likelihood_with_prior(
+    params: np.ndarray,
+    data: pd.DataFrame,
+    teams: list[str],
+    weights: np.ndarray,
+    team_idx: dict,
+    prior_constraints: list[tuple[int, int, float, float]],  # (hi, ai, log_lam_mkt, log_mu_mkt)
+    prior_strength: float,
+) -> float:
+    """Log-likelihood + L2 prior penalising deviation from market-implied goals."""
+    n = len(teams)
+    alphas = np.exp(params[:n])
+    deltas = np.exp(params[n:2 * n])
+    gammas = np.exp(params[2 * n:3 * n])
+    rho = params[3 * n]
+
+    hi = np.array([team_idx[t] for t in data["home_team"]])
+    ai = np.array([team_idx[t] for t in data["away_team"]])
+    hg = data["home_goals"].values.astype(int)
+    ag = data["away_goals"].values.astype(int)
+
+    lam = alphas[hi] * deltas[ai] * gammas[hi]
+    mu  = alphas[ai] * deltas[hi]
+
+    log_p = (
+        hg * np.log(lam) - lam - gammaln(hg + 1)
+        + ag * np.log(mu) - mu - gammaln(ag + 1)
+    )
+
+    tau = np.ones(len(hg))
+    mask_00 = (hg == 0) & (ag == 0)
+    mask_10 = (hg == 1) & (ag == 0)
+    mask_01 = (hg == 0) & (ag == 1)
+    mask_11 = (hg == 1) & (ag == 1)
+    tau[mask_00] = 1 - lam[mask_00] * mu[mask_00] * rho
+    tau[mask_10] = 1 + mu[mask_10] * rho
+    tau[mask_01] = 1 + lam[mask_01] * rho
+    tau[mask_11] = 1 - rho
+    tau = np.clip(tau, 1e-10, None)
+
+    ll = np.sum(weights * (log_p + np.log(tau)))
+
+    # Prior: L2 penalty on log-scale deviation from market-implied goals
+    prior = 0.0
+    for h_idx, a_idx, log_lam_mkt, log_mu_mkt in prior_constraints:
+        log_lam_pred = np.log(alphas[h_idx] * deltas[a_idx] * gammas[h_idx])
+        log_mu_pred  = np.log(alphas[a_idx] * deltas[h_idx])
+        prior += (log_lam_pred - log_lam_mkt) ** 2
+        prior += (log_mu_pred  - log_mu_mkt)  ** 2
+
+    return -ll + prior_strength * prior
+
+
+# ---------------------------------------------------------------------------
 # Model fitting
 # ---------------------------------------------------------------------------
 
@@ -290,6 +387,91 @@ class DixonColesModel:
             f"hottest form: {hot} ({self.form[hot]:.3f}) | "
             f"coldest form: {cold} ({self.form[cold]:.3f})"
         )
+
+    def fit_with_prior(
+        self,
+        results: list[dict],
+        odds_list: list[dict],
+        prior_strength: float = PRIOR_STRENGTH,
+    ) -> None:
+        """
+        Fit the model like fit(), but add a Bayesian prior that pulls λ/μ toward
+        market-implied expected goals derived from bookmaker odds.
+
+        odds_list: list of dicts with keys home_team, away_team,
+                   implied_home_prob, implied_draw_prob, implied_away_prob.
+        """
+        if not results:
+            raise ValueError("No results provided.")
+
+        df = pd.DataFrame(results)
+        self.teams = sorted(set(df["home_team"].tolist() + df["away_team"].tolist()))
+        n = len(self.teams)
+        logger.info(
+            f"Fitting Dixon-Coles model with Bayesian prior "
+            f"(strength={prior_strength}) on {len(df)} matches, {n} teams"
+        )
+
+        weights = _time_weights(df["date"].tolist(), settings.time_decay_half_life_days)
+        self._h2h_df = df.reset_index(drop=True)
+        self._h2h_weights = weights
+        team_idx = {t: i for i, t in enumerate(self.teams)}
+
+        # Build prior constraints from bookmaker odds
+        prior_constraints: list[tuple[int, int, float, float]] = []
+        skipped = 0
+        for o in odds_list:
+            home = o.get("home_team")
+            away = o.get("away_team")
+            if home not in team_idx or away not in team_idx:
+                continue
+            imp = _market_implied_goals(
+                o["implied_home_prob"],
+                o["implied_draw_prob"],
+                o["implied_away_prob"],
+            )
+            if imp is None:
+                skipped += 1
+                continue
+            lam_mkt, mu_mkt = imp
+            prior_constraints.append((
+                team_idx[home], team_idx[away],
+                math.log(lam_mkt), math.log(mu_mkt),
+            ))
+
+        logger.info(
+            f"Prior constraints: {len(prior_constraints)} fixtures "
+            f"({skipped} skipped — odds inversion failed)"
+        )
+
+        x0 = np.zeros(3 * n + 1)
+        result = minimize(
+            _neg_log_likelihood_with_prior,
+            x0,
+            args=(df, self.teams, weights, team_idx, prior_constraints, prior_strength),
+            method="L-BFGS-B",
+            options={"maxiter": 500, "ftol": 1e-9},
+        )
+
+        if not result.success:
+            logger.warning(f"Optimiser warning: {result.message}")
+
+        params = result.x
+        alphas_raw = np.exp(params[:n])
+        deltas_raw = np.exp(params[n:2 * n])
+        gammas_raw = np.exp(params[2 * n:3 * n])
+        self.rho = float(params[3 * n])
+
+        self.alphas = {t: float(alphas_raw[i]) for i, t in enumerate(self.teams)}
+        self.deltas = {t: float(deltas_raw[i]) for i, t in enumerate(self.teams)}
+        self.gammas = {t: float(gammas_raw[i]) for i, t in enumerate(self.teams)}
+        self.fitted = True
+
+        avg_gamma = float(np.mean(gammas_raw))
+        logger.info(
+            f"Bayes model fitted. rho: {self.rho:.4f} | avg γ: {avg_gamma:.3f}"
+        )
+        self.form = self._compute_form(df)
 
     def _compute_form(self, df: pd.DataFrame) -> dict[str, float]:
         """
@@ -492,10 +674,11 @@ class DixonColesModel:
 
 
 # ---------------------------------------------------------------------------
-# Module-level singleton
+# Module-level singletons — base model and Bayesian prior model
 # ---------------------------------------------------------------------------
 
 _model_instance: DixonColesModel | None = None
+_model_bayes: DixonColesModel | None = None
 
 
 def get_model() -> DixonColesModel:
@@ -503,3 +686,10 @@ def get_model() -> DixonColesModel:
     if _model_instance is None:
         _model_instance = DixonColesModel()
     return _model_instance
+
+
+def get_model_bayes() -> DixonColesModel:
+    global _model_bayes
+    if _model_bayes is None:
+        _model_bayes = DixonColesModel()
+    return _model_bayes
