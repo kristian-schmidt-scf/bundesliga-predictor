@@ -16,8 +16,16 @@ function ProbBar({ label, value }) {
   )
 }
 
+function restLabel(days) {
+  if (days == null) return null
+  if (days < 4)  return { text: `${days}d ⚡`, cls: 'rest-fatigued' }
+  if (days > 14) return { text: `${days}d 🧊`, cls: 'rest-rusty' }
+  return { text: `${days}d`, cls: 'rest-normal' }
+}
+
 export default function FixtureCard({ prediction, showTipp11, blendOdds }) {
-  const { fixture, win_probabilities, expected_home_goals, expected_away_goals, most_likely_score, score_matrix, odds, edge_home_win, edge_draw, edge_away_win } = prediction
+  const { fixture, win_probabilities, expected_home_goals, expected_away_goals, most_likely_score, score_matrix, odds, edge_home_win, edge_draw, edge_away_win,
+    rest_days_home, rest_days_away, travel_km } = prediction
 
   const canBlend = blendOdds && odds?.implied_home_prob
   const effectiveMatrix = canBlend
@@ -62,6 +70,19 @@ export default function FixtureCard({ prediction, showTipp11, blendOdds }) {
             {actualScore ? `Model: ${most_likely_score}` : most_likely_score}
           </span>
           <span className="xg">xG {expected_home_goals.toFixed(2)} – {expected_away_goals.toFixed(2)}</span>
+          {(rest_days_home != null || rest_days_away != null || travel_km > 0) && (
+            <span className="fatigue-row">
+              {(() => {
+                const rh = restLabel(rest_days_home)
+                const ra = restLabel(rest_days_away)
+                return <>
+                  {rh && <span className={`rest-tag ${rh.cls}`}>{rh.text}</span>}
+                  {travel_km > 0 && <span className="travel-tag">{Math.round(travel_km)}km</span>}
+                  {ra && <span className={`rest-tag ${ra.cls}`}>{ra.text}</span>}
+                </>
+              })()}
+            </span>
+          )}
         </div>
         <div className="team away">
           {away_team.crest_url && <img src={away_team.crest_url} alt="" className="crest" />}

@@ -124,3 +124,10 @@ class Prediction(BaseModel):
     edge_home_win: Optional[float] = None
     edge_draw: Optional[float] = None
     edge_away_win: Optional[float] = None
+    # Fatigue & travel
+    rest_days_home: Optional[int] = None
+    rest_days_away: Optional[int] = None
+    rest_factor_home: Optional[float] = None
+    rest_factor_away: Optional[float] = None
+    travel_km: Optional[float] = None
+    travel_factor: Optional[float] = None

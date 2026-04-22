@@ -49,44 +49,50 @@ VARIANTS = [
     {
         "key": "full",
         "name": "Full model",
-        "description": "Per-team γ + H2H adjustment + recent form",
-        "use_team_gamma": True, "use_h2h": True, "use_form": True,
+        "description": "Per-team γ + H2H + form + fatigue/travel",
+        "use_team_gamma": True, "use_h2h": True, "use_form": True, "use_fatigue": True,
     },
     {
         "key": "no_h2h",
         "name": "No H2H",
-        "description": "Per-team γ + form, H2H adjustment disabled",
-        "use_team_gamma": True, "use_h2h": False, "use_form": True,
+        "description": "Per-team γ + form + fatigue, H2H disabled",
+        "use_team_gamma": True, "use_h2h": False, "use_form": True, "use_fatigue": True,
     },
     {
         "key": "no_form",
         "name": "No form",
-        "description": "Per-team γ + H2H, recent form scaling disabled",
-        "use_team_gamma": True, "use_h2h": True, "use_form": False,
+        "description": "Per-team γ + H2H + fatigue, form disabled",
+        "use_team_gamma": True, "use_h2h": True, "use_form": False, "use_fatigue": True,
+    },
+    {
+        "key": "no_fatigue",
+        "name": "No fatigue",
+        "description": "Per-team γ + H2H + form, rest/travel fatigue disabled",
+        "use_team_gamma": True, "use_h2h": True, "use_form": True, "use_fatigue": False,
     },
     {
         "key": "global_gamma",
         "name": "Global γ",
-        "description": "Average home advantage for all teams (no per-team γ), H2H + form kept",
-        "use_team_gamma": False, "use_h2h": True, "use_form": True,
+        "description": "Average home advantage for all teams, H2H + form + fatigue kept",
+        "use_team_gamma": False, "use_h2h": True, "use_form": True, "use_fatigue": True,
     },
     {
         "key": "baseline",
         "name": "Baseline",
-        "description": "Global γ, no H2H, no form — plain Dixon-Coles",
-        "use_team_gamma": False, "use_h2h": False, "use_form": False,
+        "description": "Global γ, no H2H, no form, no fatigue — plain Dixon-Coles",
+        "use_team_gamma": False, "use_h2h": False, "use_form": False, "use_fatigue": False,
     },
     {
         "key": "blend",
         "name": "+ Bookmaker blend",
         "description": "Full model blended 50/50 with bookmaker implied probs (requires cached odds)",
-        "use_team_gamma": True, "use_h2h": True, "use_form": True,
+        "use_team_gamma": True, "use_h2h": True, "use_form": True, "use_fatigue": True,
     },
     {
         "key": "bookmaker",
         "name": "Bookmaker only",
         "description": "Normalised bookmaker implied probabilities — the market alone (requires cached odds)",
-        "use_team_gamma": True, "use_h2h": True, "use_form": True,
+        "use_team_gamma": True, "use_h2h": True, "use_form": True, "use_fatigue": True,
     },
 ]
 
@@ -108,6 +114,7 @@ async def get_calibration():
 
     for fixture in finished:
         home, away = fixture.home_team.name, fixture.away_team.name
+        fixture_date = fixture.utc_date.isoformat()
         actual = _actual_tendency(fixture.home_score, fixture.away_score)
         cached = prediction_cache.get(fixture.id)
 
@@ -117,7 +124,8 @@ async def get_calibration():
             full_rec = {"p_h": wp.home_win, "p_d": wp.draw, "p_a": wp.away_win, "actual": actual}
         else:
             try:
-                pred = model.predict(home, away, use_team_gamma=True, use_h2h=True, use_form=True)
+                pred = model.predict(home, away, fixture_date=fixture_date,
+                                     use_team_gamma=True, use_h2h=True, use_form=True, use_fatigue=True)
                 full_rec = {"p_h": pred["home_win"], "p_d": pred["draw"], "p_a": pred["away_win"], "actual": actual}
             except Exception:
                 continue
@@ -145,9 +153,11 @@ async def get_calibration():
                 try:
                     pred = model.predict(
                         home, away,
+                        fixture_date=fixture_date,
                         use_team_gamma=v["use_team_gamma"],
                         use_h2h=v["use_h2h"],
                         use_form=v["use_form"],
+                        use_fatigue=v["use_fatigue"],
                     )
                     variant_records[v["key"]].append({
                         "p_h": pred["home_win"], "p_d": pred["draw"],

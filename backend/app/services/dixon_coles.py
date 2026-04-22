@@ -13,6 +13,7 @@ Key ideas:
 - Time decay weights recent matches more heavily (exponential decay)
 """
 
+import math
 import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
@@ -25,6 +26,84 @@ import logging
 logger = logging.getLogger(__name__)
 
 MAX_GOALS = 8  # We compute P(i, j) for i,j in 0..MAX_GOALS
+
+
+# ---------------------------------------------------------------------------
+# Stadium coordinates (WGS-84 lat/lon) — covers all teams from last 3 seasons
+# ---------------------------------------------------------------------------
+
+STADIUM_COORDS: dict[str, tuple[float, float]] = {
+    "FC Bayern München":         (48.2188, 11.6248),
+    "Borussia Dortmund":         (51.4926,  7.4519),
+    "Bayer 04 Leverkusen":       (51.0384,  7.0024),
+    "RB Leipzig":                (51.3457, 12.3484),
+    "Borussia Mönchengladbach":  (51.1742,  6.3853),
+    "Eintracht Frankfurt":       (50.0687,  8.6455),
+    "VfB Stuttgart":             (48.7924,  9.2324),
+    "SC Freiburg":               (47.9948,  7.8955),
+    "VfL Wolfsburg":             (52.4322, 10.8037),
+    "FC Augsburg":               (48.3237, 10.8855),
+    "1. FC Union Berlin":        (52.4575, 13.5682),
+    "TSG 1899 Hoffenheim":       (49.2385,  8.8889),
+    "Werder Bremen":             (53.0667,  8.8374),
+    "1. FC Köln":                (50.9336,  6.8750),
+    "VfL Bochum 1848":           (51.4895,  7.2369),
+    "1. FSV Mainz 05":           (49.9843,  8.2242),
+    "1. FC Heidenheim 1846":     (48.6750, 10.1498),
+    "SV Darmstadt 98":           (49.8713,  8.6571),
+    "FC St. Pauli":              (53.5547,  9.9685),
+    "Holstein Kiel":             (54.3648, 10.1378),
+    "FC Schalke 04":             (51.5546,  7.0680),
+    "Hertha BSC":                (52.5145, 13.2394),
+    "SpVgg Greuther Fürth":      (49.4797, 10.9783),
+}
+
+# ---------------------------------------------------------------------------
+# Fatigue / travel constants and helpers
+# ---------------------------------------------------------------------------
+
+REST_FATIGUE_DAYS  = 4      # below this: fatigue zone
+REST_RUST_DAYS     = 14     # above this: rust zone
+REST_MAX_FATIGUE   = 0.10   # max 10% penalty at 0 days rest
+REST_MAX_RUST      = 0.04   # max  4% penalty for very long break
+REST_RUST_SCALE    = 14.0   # days beyond REST_RUST_DAYS for full rust penalty
+MAX_TRAVEL_PENALTY = 0.03   # max  3% penalty for longest Bundesliga trip
+TRAVEL_SCALE_KM    = 800.0  # distance at which travel penalty saturates
+
+
+def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    R = 6371.0
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlambda = math.radians(lon2 - lon1)
+    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
+    return R * 2 * math.asin(math.sqrt(a))
+
+
+def _rest_factor(days: int | None) -> float:
+    """Multiplicative factor based on days since last match. Peak at 7 days (factor=1.0)."""
+    if days is None:
+        return 1.0
+    if days < REST_FATIGUE_DAYS:
+        return 1.0 - REST_MAX_FATIGUE * (1.0 - days / REST_FATIGUE_DAYS)
+    if days <= REST_RUST_DAYS:
+        return 1.0
+    return 1.0 - min((days - REST_RUST_DAYS) / REST_RUST_SCALE, 1.0) * REST_MAX_RUST
+
+
+def _travel_factor_km(home_team: str, away_team: str) -> tuple[float, float]:
+    """Returns (travel_factor, travel_km). Factor < 1 penalises the away team."""
+    h = STADIUM_COORDS.get(home_team)
+    a = STADIUM_COORDS.get(away_team)
+    if h is None:
+        logger.warning(f"travel_factor: unknown stadium for '{home_team}'")
+    if a is None:
+        logger.warning(f"travel_factor: unknown stadium for '{away_team}'")
+    if h is None or a is None:
+        return 1.0, 0.0
+    km = _haversine_km(a[0], a[1], h[0], h[1])
+    factor = 1.0 - min(km / TRAVEL_SCALE_KM, 1.0) * MAX_TRAVEL_PENALTY
+    return factor, round(km, 1)
 
 
 # ---------------------------------------------------------------------------
@@ -240,6 +319,23 @@ class DixonColesModel:
             for t in teams
         }
 
+    def _compute_rest(self, team: str, fixture_date: str) -> int | None:
+        """Days since team's most recent match before fixture_date. None if no prior match."""
+        if self._h2h_df is None:
+            return None
+        fixture_dt = datetime.fromisoformat(fixture_date.replace("Z", "+00:00"))
+        mask = (self._h2h_df["home_team"] == team) | (self._h2h_df["away_team"] == team)
+        team_df = self._h2h_df[mask].copy()
+        if team_df.empty:
+            return None
+        team_df["_dt"] = team_df["date"].apply(
+            lambda d: datetime.fromisoformat(d.replace("Z", "+00:00"))
+        )
+        prior = team_df[team_df["_dt"] < fixture_dt]
+        if prior.empty:
+            return None
+        return (fixture_dt.date() - prior["_dt"].max().date()).days
+
     def _h2h_adjust(
         self, home_team: str, away_team: str, lam_base: float, mu_base: float
     ) -> tuple[float, float]:
@@ -293,9 +389,11 @@ class DixonColesModel:
         self,
         home_team: str,
         away_team: str,
+        fixture_date: str | None = None,
         use_team_gamma: bool = True,
         use_h2h: bool = True,
         use_form: bool = True,
+        use_fatigue: bool = True,
     ) -> dict:
         """
         Predict score distribution for a fixture.
@@ -329,6 +427,28 @@ class DixonColesModel:
         lam *= form_h
         mu  *= form_a
 
+        # --- Fatigue & travel ---
+        rest_days_home: int | None = None
+        rest_days_away: int | None = None
+        rf_home = rf_away = tf = 1.0
+        travel_km = 0.0
+
+        if use_fatigue and fixture_date is not None:
+            rest_days_home = self._compute_rest(home_team, fixture_date)
+            rest_days_away = self._compute_rest(away_team, fixture_date)
+            rf_home = _rest_factor(rest_days_home)
+            rf_away = _rest_factor(rest_days_away)
+            tf, travel_km = _travel_factor_km(home_team, away_team)
+            lam *= rf_home
+            mu  *= rf_away
+            mu  *= tf
+            logger.debug(
+                f"Fatigue {home_team} vs {away_team}: "
+                f"rest_h={rest_days_home}d({rf_home:.3f}) "
+                f"rest_a={rest_days_away}d({rf_away:.3f}) "
+                f"travel={travel_km:.0f}km({tf:.3f})"
+            )
+
         # Build score probability matrix
         score_matrix = np.zeros((MAX_GOALS + 1, MAX_GOALS + 1))
         for i in range(MAX_GOALS + 1):
@@ -361,6 +481,12 @@ class DixonColesModel:
             "expected_home_goals": round(float(lam), 2),
             "expected_away_goals": round(float(mu), 2),
             "most_likely_score": most_likely,
+            "rest_days_home": rest_days_home,
+            "rest_days_away": rest_days_away,
+            "rest_factor_home": round(rf_home, 4),
+            "rest_factor_away": round(rf_away, 4),
+            "travel_km": round(travel_km, 1),
+            "travel_factor": round(tf, 4),
         }
 
 

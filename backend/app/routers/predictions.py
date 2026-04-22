@@ -40,6 +40,12 @@ def _build_prediction(fixture, pred, match_odds) -> Prediction:
         edge_home_win=edge_home,
         edge_draw=edge_draw,
         edge_away_win=edge_away,
+        rest_days_home=pred.get("rest_days_home"),
+        rest_days_away=pred.get("rest_days_away"),
+        rest_factor_home=pred.get("rest_factor_home"),
+        rest_factor_away=pred.get("rest_factor_away"),
+        travel_km=pred.get("travel_km"),
+        travel_factor=pred.get("travel_factor"),
     )
 
 
@@ -79,7 +85,7 @@ async def get_predictions_for_upcoming_fixtures():
                 continue
 
         try:
-            pred = model.predict(home, away)
+            pred = model.predict(home, away, fixture_date=fixture.utc_date.isoformat())
         except Exception as e:
             logger.warning(f"Prediction failed for {home} vs {away}: {e}")
             continue
@@ -94,7 +100,7 @@ async def get_predictions_for_upcoming_fixtures():
 
 
 @router.get("/match", response_model=Prediction)
-async def get_prediction_for_match(home_team: str, away_team: str):
+async def get_prediction_for_match(home_team: str, away_team: str, fixture_date: str | None = None):
     """
     Get a prediction for a specific match by team names.
     Useful for ad-hoc queries during development.
@@ -104,7 +110,7 @@ async def get_prediction_for_match(home_team: str, away_team: str):
         raise HTTPException(status_code=503, detail="Model not yet fitted.")
 
     try:
-        pred = model.predict(home_team, away_team)
+        pred = model.predict(home_team, away_team, fixture_date=fixture_date)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -149,4 +155,10 @@ async def get_prediction_for_match(home_team: str, away_team: str):
         edge_home_win=edge_home,
         edge_draw=edge_draw,
         edge_away_win=edge_away,
+        rest_days_home=pred.get("rest_days_home"),
+        rest_days_away=pred.get("rest_days_away"),
+        rest_factor_home=pred.get("rest_factor_home"),
+        rest_factor_away=pred.get("rest_factor_away"),
+        travel_km=pred.get("travel_km"),
+        travel_factor=pred.get("travel_factor"),
     )
