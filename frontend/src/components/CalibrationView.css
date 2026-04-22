@@ -211,6 +211,12 @@
 .cal-table td.good { color: #4caf50; }
 .cal-table td.bad  { color: #ef5350; }
 
+.cal-params-table td { font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+.cal-params-table td:first-child { text-align: left; color: #ccc; font-size: 0.78rem; }
+.cal-delta { font-size: 0.72rem; }
+.cal-delta.good { color: #4caf50; }
+.cal-delta.bad  { color: #ef5350; }
+
 .cal-chart {
   display: block;
   width: 100%;

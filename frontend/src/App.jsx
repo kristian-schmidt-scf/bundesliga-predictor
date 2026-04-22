@@ -135,6 +135,7 @@ export default function App() {
   const [showTable, setShowTable] = useState(false)
   const [showCalibration, setShowCalibration] = useState(false)
   const [modelVariant, setModelVariant] = useState('base')
+  const [bayesPredictions, setBayesPredictions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -200,6 +201,14 @@ export default function App() {
       .catch(err => setError(err.message))
       .finally(() => setLoading(false))
   }, [modelVariant])
+
+  // Fetch Bayes predictions for side-by-side Tipp 11 comparison
+  useEffect(() => {
+    if (!showTipp11) return
+    axios.get('/api/predictions/upcoming?model_variant=bayes')
+      .then(res => setBayesPredictions(res.data))
+      .catch(() => setBayesPredictions([]))
+  }, [showTipp11])
 
   function toggleFavorite() {
     if (favoriteTeam === selectedTeam) {
@@ -318,7 +327,11 @@ export default function App() {
 
           {!showTable && !showCalibration && <AccuracySummary predictions={visiblePredictions} />}
           {!showTable && !showCalibration && showTipp11 && (
-            <Tipp11Summary predictions={visiblePredictions} useBlend={blendOdds} />
+            <Tipp11Summary
+              predictions={visiblePredictions}
+              bayesPredictions={bayesPredictions}
+              useBlend={blendOdds}
+            />
           )}
 
           {showCalibration ? (

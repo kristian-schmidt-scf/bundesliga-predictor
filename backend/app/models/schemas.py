@@ -4,6 +4,30 @@ from datetime import datetime
 
 
 # ---------------------------------------------------------------------------
+# Model parameters
+# ---------------------------------------------------------------------------
+
+class TeamParams(BaseModel):
+    team: str
+    alpha_base: float
+    delta_base: float
+    gamma_base: float
+    form_base: float
+    alpha_bayes: Optional[float] = None
+    delta_bayes: Optional[float] = None
+    gamma_bayes: Optional[float] = None
+    form_bayes: Optional[float] = None
+
+
+class ModelParamsResponse(BaseModel):
+    rho_base: float
+    rho_bayes: Optional[float] = None
+    prior_strength: float
+    bayes_fitted: bool
+    teams: list[TeamParams]
+
+
+# ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
 

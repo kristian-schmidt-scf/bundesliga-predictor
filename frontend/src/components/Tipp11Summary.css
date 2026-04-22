@@ -66,6 +66,12 @@
 .t11s-result { color: #888; }
 .t11s-dash   { color: #444; }
 
+.t11s-tip-hdr    { color: #6dbe6d; }
+.t11s-bayes-hdr  { color: #9c8fff; }
+.t11s-bayes-tip  { color: #9c8fff; font-weight: 700; }
+.t11s-bayes-tip.differs { background: rgba(156,143,255,0.08); }
+.t11s-bayes-xpts { color: #9c8fff; }
+
 /* Actual points colour coding — qualified to beat row-level rules */
 .t11s-table .pts-high { color: #4caf50; font-weight: 700; }
 .t11s-table .pts-mid  { color: #f5c518; }

@@ -89,12 +89,16 @@ function SpieltagChart({ perMatchday, metricKey, yLabel, refLines }) {
 
 export default function CalibrationView() {
   const [data, setData] = useState(null)
+  const [params, setParams] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    axios.get('/api/calibration')
-      .then(res => setData(res.data))
+    Promise.all([
+      axios.get('/api/calibration'),
+      axios.get('/api/model-params'),
+    ])
+      .then(([cal, par]) => { setData(cal.data); setParams(par.data) })
       .catch(err => setError(err.message))
       .finally(() => setLoading(false))
   }, [])
@@ -245,6 +249,55 @@ export default function CalibrationView() {
                   </td>
                 </tr>
               ))}
+            </tbody>
+          </table>
+        </>
+      )}
+
+      {params && (
+        <>
+          <div className="cal-section-title cal-section-mt">Model parameters</div>
+          <p className="cal-description">
+            Fitted attack (α), defence (δ), home advantage (γ), and form factor per team.
+            {params.bayes_fitted && ` The Δ columns show the difference the Bayesian prior (strength=${params.prior_strength}) made — positive means the market pushed the parameter up.`}
+            {' '}Global: ρ (low-score correction) base={params.rho_base.toFixed(4)}{params.rho_bayes != null ? `, bayes=${params.rho_bayes.toFixed(4)}` : ''}.
+          </p>
+          <table className="cal-table cal-params-table">
+            <thead>
+              <tr>
+                <th>Team</th>
+                <th>α base</th>
+                {params.bayes_fitted && <th>α Δ</th>}
+                <th>δ base</th>
+                {params.bayes_fitted && <th>δ Δ</th>}
+                <th>γ base</th>
+                {params.bayes_fitted && <th>γ Δ</th>}
+                <th>Form</th>
+              </tr>
+            </thead>
+            <tbody>
+              {params.teams.map(t => {
+                const da = params.bayes_fitted ? t.alpha_bayes - t.alpha_base : null
+                const dd = params.bayes_fitted ? t.delta_bayes - t.delta_base : null
+                const dg = params.bayes_fitted ? t.gamma_bayes - t.gamma_base : null
+                const delta = (v, cls) => v == null ? null : (
+                  <td className={`cal-delta ${v > 0.005 ? 'good' : v < -0.005 ? 'bad' : ''}`}>
+                    {v > 0 ? '+' : ''}{v.toFixed(3)}
+                  </td>
+                )
+                return (
+                  <tr key={t.team}>
+                    <td>{t.team}</td>
+                    <td>{t.alpha_base.toFixed(3)}</td>
+                    {params.bayes_fitted && delta(da)}
+                    <td>{t.delta_base.toFixed(3)}</td>
+                    {params.bayes_fitted && delta(dd)}
+                    <td className={t.gamma_base > 1.3 ? 'good' : t.gamma_base < 0.9 ? 'bad' : ''}>{t.gamma_base.toFixed(3)}</td>
+                    {params.bayes_fitted && delta(dg)}
+                    <td className={t.form_base > 1.05 ? 'good' : t.form_base < 0.95 ? 'bad' : ''}>{t.form_base.toFixed(3)}</td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </>

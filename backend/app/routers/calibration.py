@@ -2,7 +2,7 @@ import math
 from collections import defaultdict
 from fastapi import APIRouter
 from app.services import football_data, prediction_cache
-from app.services.dixon_coles import get_model
+from app.services.dixon_coles import get_model, get_model_bayes, PRIOR_STRENGTH
 from app.models.schemas import (
     CalibrationResult, CalibrationMatchday, CalibrationBucket, CalibrationVariant
 )
@@ -94,6 +94,13 @@ VARIANTS = [
         "description": "Normalised bookmaker implied probabilities — the market alone (requires cached odds)",
         "use_team_gamma": True, "use_h2h": True, "use_form": True, "use_fatigue": True,
     },
+    {
+        "key": "bayes_prior",
+        "name": "Bayes prior model",
+        "description": f"Base model refitted with bookmaker odds as MAP prior (strength={PRIOR_STRENGTH})",
+        "use_team_gamma": True, "use_h2h": True, "use_form": True, "use_fatigue": True,
+        "use_bayes": True,
+    },
 ]
 
 
@@ -149,6 +156,17 @@ async def get_calibration():
                     variant_records[v["key"]].append({"p_h": p_h, "p_d": p_d, "p_a": p_a, "actual": actual})
             elif v["key"] == "full":
                 variant_records["full"].append(full_rec)
+            elif v.get("use_bayes"):
+                bayes = get_model_bayes()
+                if bayes.fitted:
+                    try:
+                        pred = bayes.predict(home, away, fixture_date=fixture_date)
+                        variant_records["bayes_prior"].append({
+                            "p_h": pred["home_win"], "p_d": pred["draw"],
+                            "p_a": pred["away_win"], "actual": actual,
+                        })
+                    except Exception:
+                        pass
             else:
                 try:
                     pred = model.predict(
