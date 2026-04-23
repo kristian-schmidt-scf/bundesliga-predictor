@@ -71,11 +71,11 @@ def _best_tipp11_tip(matrix: list[list[float]]) -> tuple[int, int, float]:
 async def compute_backtest(
     historical: list[dict] | None = None,
     current_all: list[dict] | None = None,
-    ruckrunde: list | None = None,
 ) -> None:
     """
     Run walk-forward backtest and store result in module cache.
-    Pre-fetched data can be passed in to avoid extra API calls on startup.
+    Uses only historical + current_all (both available from startup data),
+    making zero additional API calls.
     """
     global _cache, _computing
     _computing = True
@@ -86,23 +86,16 @@ async def compute_backtest(
             historical = await football_data.get_historical_results(settings.seasons_to_fetch)
         if current_all is None:
             current_all = await football_data.get_current_season_results()
-        if ruckrunde is None:
-            ruckrunde = await football_data.get_current_and_upcoming_fixtures()
-
-        # Group Rückrunde fixtures by matchday
-        by_md: dict[int, list] = {}
-        for f in ruckrunde:
-            by_md.setdefault(f.matchday, []).append(f)
 
         per_matchday = []
 
         for spieltag in range(BACKTEST_FROM, BACKTEST_TO + 1):
-            fixtures_md = by_md.get(spieltag, [])
+            # Finished fixtures for this spieltag come from current_all
             finished = [
-                f for f in fixtures_md
-                if f.status == 'FINISHED'
-                and f.home_score is not None
-                and f.away_score is not None
+                r for r in current_all
+                if r.get("matchday") == spieltag
+                and r.get("home_goals") is not None
+                and r.get("away_goals") is not None
             ]
             if not finished:
                 logger.info(f"Backtest: Spieltag {spieltag} — no finished fixtures, skipping")
@@ -123,13 +116,13 @@ async def compute_backtest(
             brier_list, ll_list, correct = [], [], []
             t11_exp_total = t11_act_total = 0.0
 
-            for fixture in finished:
-                home, away = fixture.home_team.name, fixture.away_team.name
-                h_act, a_act = fixture.home_score, fixture.away_score
+            for r in finished:
+                home, away = r["home_team"], r["away_team"]
+                h_act, a_act = int(r["home_goals"]), int(r["away_goals"])
                 actual = _tendency(h_act, a_act)
 
                 try:
-                    pred = model.predict(home, away, fixture_date=fixture.utc_date.isoformat())
+                    pred = model.predict(home, away, fixture_date=r["date"])
                 except Exception:
                     continue
 

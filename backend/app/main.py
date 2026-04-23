@@ -65,11 +65,10 @@ async def lifespan(app: FastAPI):
             logger.warning(f"Bayesian model fitting failed: {e} — Bayes predictions unavailable.")
 
         # Start walk-forward backtest as a non-blocking background task.
-        # Pass already-fetched data to avoid extra API calls (free tier rate limit).
+        # Only needs historical + current — zero extra API calls.
         asyncio.create_task(backtest_service.compute_backtest(
-            historical=historical,       # 3 past seasons (base training data)
-            current_all=current,         # current season results with matchday info
-            ruckrunde=upcoming_fixtures, # Rückrunde fixtures with actual scores
+            historical=historical,
+            current_all=current,
         ))
         logger.info("=== Backtest started in background (Spieltage 18–30) ===")
 
