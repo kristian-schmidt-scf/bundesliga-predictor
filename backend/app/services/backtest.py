@@ -151,7 +151,8 @@ async def compute_backtest(
                 brier_list.append((p_h-i_h)**2 + (p_d-i_d)**2 + (p_a-i_a)**2)
                 p_act = p_h if actual == 'H' else (p_d if actual == 'D' else p_a)
                 ll_list.append(-math.log(max(p_act, 1e-10)))
-                correct.append(1 if _tendency(p_h, p_d, p_a) == actual else 0)
+                pred_tend = 'H' if p_h >= p_d and p_h >= p_a else ('A' if p_a > p_d else 'D')
+                correct.append(1 if pred_tend == actual else 0)
 
                 h_tip, a_tip, exp_pts = _best_tipp11_tip(pred["score_matrix"])
                 t11_exp_total += exp_pts
