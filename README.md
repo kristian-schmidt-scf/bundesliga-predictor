@@ -1,97 +1,40 @@
 # Bundesliga Predictor
 
-> A full-stack Bundesliga match prediction app built on the **Dixon-Coles Poisson model** — with bookmaker edge analysis, Tipp 11 optimisation, and model calibration tracking.
-
 ![Python](https://img.shields.io/badge/Python-3.11-3776ab?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688?logo=fastapi&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61dafb?logo=react&logoColor=white)
 ![Vite](https://img.shields.io/badge/Vite-5-646cff?logo=vite&logoColor=white)
-![Dixon-Coles](https://img.shields.io/badge/Model-Dixon--Coles-8a2be2)
+
+A personal project that predicts Bundesliga match outcomes using a statistical football model, and compares those predictions against bookmaker odds to find edges. It also serves as a Tipp 11 assistant — working out which scoreline tip maximises your expected points for each fixture.
+
+The app pulls three seasons of historical results on startup, fits a Dixon-Coles Poisson model, and serves predictions for every upcoming fixture. A React frontend displays score probability heatmaps, win/draw/loss bars, bookmaker odds comparisons, and a live league table with model-projected final standings.
 
 ---
 
-## What it does
+## Features
 
-The app pulls three seasons of Bundesliga results, fits a Bayesian football model on startup, and serves live predictions for every fixture in the current Rückrunde. Predictions are compared against bookmaker odds to identify edges, and the full 9×9 score-probability matrix is used to recommend the optimal Tipp 11 tip for each game.
-
----
-
-## Data & prediction pipeline
-
-```mermaid
-flowchart LR
-    A[(football-data.org\n3 seasons + current)] -->|historical results| B
-    C[(The Odds API\nEU bookmaker odds)] -->|implied probs| D
-
-    subgraph B[Model fitting — on startup]
-        B1[Dixon-Coles MLE\nattack · defence · home γᵢ] --> B2[H2H shrinkage\nBayesian adjustment]
-        B2 --> B3[Form scaling\nlast 5 games PPG]
-        B3 --> B4[Fatigue factor\nrest days · travel km]
-    end
-
-    B --> E[Predictions\nλ μ · 9×9 matrix]
-    D --> F[Edge\nmodel prob − implied]
-    E --> F
-    E --> G[Tipp 11\nexpected points per tip]
-    F --> H[React frontend]
-    G --> H
-```
+- **Match predictions** — 9×9 score probability heatmap, win/draw/loss probabilities, expected goals, most likely scoreline
+- **Bookmaker edge** — live EU odds fetched at request time, normalised implied probabilities, edge per outcome highlighted
+- **Tipp 11 assistant** — optimal tip per fixture based on expected Tipp 11 points; round summary showing actual vs expected
+- **Model blend** — toggle a 50/50 Dixon-Coles + bookmaker blend affecting all outputs
+- **League table** — live standings with model-implied projected points for remaining fixtures
+- **Calibration** — Brier score, log-loss, per-matchday chart, and an ablation table comparing 8 model variants
+- **Back-testing** — walk-forward backtest over Spieltage 18–30: tendency accuracy, Brier, log-loss, Tipp 11 expected vs actual
 
 ---
 
-## Model adjustments
+## Model
 
-Each prediction starts from a base Dixon-Coles estimate and passes through four optional adjustment layers:
+The foundation is the [Dixon-Coles model](https://doi.org/10.1111/1467-9876.00065), which estimates per-team attack and defence strengths by maximising the time-weighted log-likelihood of historical scorelines. A low-score correction (ρ) adjusts joint probabilities for the 0-0, 1-0, 0-1, and 1-1 scorelines where goal independence breaks down.
 
-```mermaid
-flowchart TD
-    A[α attack · δ defence · γᵢ home advantage] -->|base| B["λ = α_home × δ_away × γ_home\nμ = α_away × δ_home"]
-    B --> C{H2H adjustment\nk=5 shrinkage}
-    C -->|weighted avg of H2H goals| D{Form scaling\nPPG over last 5}
-    D -->|× form factor| E{Fatigue / travel\nrest days · haversine km}
-    E -->|× rest factor × travel factor| F[Score matrix P i,j\n9×9 Poisson + τ correction]
-    F --> G[Win · Draw · Loss probs]
-    F --> H[Most likely score · xG]
-```
+On top of the base model, four adjustments are applied at prediction time:
 
----
+- **Per-team home advantage** — each team gets its own γ fitted from ~17 home games per season rather than a single global factor
+- **H2H shrinkage** — Bayesian nudge of expected goals toward historical head-to-head averages (k=5 shrinkage)
+- **Form scaling** — multiplies expected goals by a form factor derived from each team's points-per-game over their last 5 matches
+- **Fatigue / travel** — rest-day penalty (optimal at 7 days, penalised below 4 or above 14) and a haversine travel distance penalty on the away side
 
-## Features at a glance
-
-| Area | What you get |
-|------|-------------|
-| **Predictions** | 9×9 score probability heatmap, win/draw/loss bars, xG, most likely score |
-| **Model enhancements** | Per-team home advantage, H2H Bayesian shrinkage, form scaling, fatigue/travel |
-| **Bookmaker comparison** | Live EU odds, implied probability normalisation, edge per outcome |
-| **Blended model** | Toggle 50/50 Dixon-Coles + bookmaker blend affecting all heatmaps and tips |
-| **Tipp 11** | Expected points per possible tip; round summary with actual vs expected |
-| **League table** | Live standings + model-implied expected points for remaining fixtures |
-| **Accuracy tracker** | Tendency accuracy, exact score rate, edge pick accuracy vs naive baseline |
-| **Calibration** | Brier score, log-loss, calibration curve, Spieltag chart, ablation comparison |
-| **Navigation** | Full Rückrunde (Spieltag 18–34), live filter, team filter with favourite |
-
----
-
-## App layout
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     Header  (banner + crests)                   │
-├──────────────────────────────────────────────────────────────────┤
-│  Spieltag  │  Live  │  Tipp 11  │  + Odds  │  Table  │  Calib  │  ← filter bar (sticky)
-├────────────┬─────────────────────────────────────────────────────┤
-│            │  Accuracy summary  (finished matchdays only)        │
-│  Sidebar   │  Tipp 11 round summary  (when Tipp 11 active)       │
-│  matchup   ├─────────────────────────────────────────────────────┤
-│  list      │  Fixture card × 9                                   │
-│  + best    │  ┌───────────────────────────────────────────────┐  │
-│  Tipp 11   │  │  Teams · score/xG · rest days · travel km    │  │
-│  tip       │  │  Win/draw/loss bars                           │  │
-│            │  │  Score heatmap  │  Tipp 11 heatmap (toggle)  │  │
-│            │  │  Odds comparison + edge                        │  │
-│            │  └───────────────────────────────────────────────┘  │
-└────────────┴─────────────────────────────────────────────────────┘
-```
+The calibration ablation table measures whether each of these adjustments actually improves predictive accuracy, making it easy to see which ones earn their place.
 
 ---
 
@@ -103,7 +46,7 @@ flowchart TD
 - Node.js 18+
 - Free API keys from [football-data.org](https://www.football-data.org/) and [The Odds API](https://the-odds-api.com/)
 
-### 1 — Backend
+### Backend
 
 ```bash
 cd backend
@@ -124,15 +67,15 @@ FOOTBALL_DATA_API_KEY=your_key_here
 ODDS_API_KEY=your_key_here
 ```
 
-Start the API server:
+Start the server:
 
 ```bash
 python -m uvicorn app.main:app
 ```
 
-On startup the model fetches ~1,100 historical matches and fits in ~10 seconds. Interactive API docs: `http://localhost:8000/docs`.
+On startup the model fetches ~1,100 historical matches and fits in around 10 seconds. Swagger docs are at `http://localhost:8000/docs`.
 
-### 2 — Frontend
+### Frontend
 
 ```bash
 cd frontend
@@ -140,88 +83,21 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:5173` — the Vite dev server proxies all `/api` calls to the backend automatically.
+Open `http://localhost:5173`. The Vite dev server proxies all `/api` calls to the backend automatically.
 
 ---
 
-## API reference
+## API
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/health` | Model status and team count |
-| `GET` | `/api/predictions/upcoming` | Predictions for Rückrunde fixtures |
-| `GET` | `/api/predictions/match` | Ad-hoc prediction (`?home_team=X&away_team=Y`) |
-| `GET` | `/api/fixtures/upcoming` | Raw fixture list |
-| `GET` | `/api/table` | League table + model-implied projected standings |
-| `GET` | `/api/calibration` | Brier score, log-loss, per-matchday, ablation variants |
-
----
-
-## Model details
-
-### Dixon-Coles foundation
-
-The [Dixon-Coles model](https://doi.org/10.1111/1467-9876.00065) estimates per-team attack (α) and defence (δ) strengths by maximising the time-weighted log-likelihood of historical scorelines. Each team also has its own home advantage parameter (γᵢ), fitted from ~17 home games per season.
-
-```
-λ (home xG) = α_home × δ_away × γ_home
-μ (away xG) = α_away × δ_home
-```
-
-A low-score correction factor ρ adjusts joint probabilities for 0-0, 1-0, 0-1, and 1-1 — the four scorelines where independence between home and away goals breaks down.
-
-### Enhancements
-
-| Enhancement | How it works | Tunable |
-|-------------|-------------|---------|
-| **Time decay** | Exponential weighting (half-life 90 days) — recent matches count more during fitting | `time_decay_half_life_days` |
-| **H2H shrinkage** | Bayesian nudge of λ/μ toward historical head-to-head goal averages (k=5) | `H2H_K` |
-| **Form scaling** | Multiplies λ/μ by `(team_ppg / avg_ppg)^κ` over last 5 games | `FORM_N_GAMES`, `FORM_KAPPA` |
-| **Fatigue** | Rest factor peaks at 7 days, penalises <4 days (fatigue) and >14 days (rust) | `REST_MAX_FATIGUE`, `REST_MAX_RUST` |
-| **Travel** | Haversine distance between stadiums → up to 3% penalty on away μ | `MAX_TRAVEL_PENALTY` |
-
-### Calibration ablations
-
-The `/api/calibration` endpoint computes Brier score and log-loss for 8 model variants simultaneously (Full, No H2H, No Form, No Fatigue, Global γ, Baseline, + Bookmaker blend, Bookmaker only) — making it straightforward to measure whether each enhancement adds genuine predictive value.
-
----
-
-## Project structure
-
-```
-bundesliga-predictor/
-├── backend/
-│   ├── app/
-│   │   ├── main.py                  # FastAPI app, lifespan model fitting
-│   │   ├── config.py                # Settings via pydantic-settings + .env
-│   │   ├── models/schemas.py        # Pydantic response schemas
-│   │   ├── routers/
-│   │   │   ├── predictions.py       # GET /api/predictions/*
-│   │   │   ├── fixtures.py          # GET /api/fixtures/*
-│   │   │   ├── table.py             # GET /api/table
-│   │   │   └── calibration.py       # GET /api/calibration
-│   │   └── services/
-│   │       ├── dixon_coles.py       # Model fitting, prediction, fatigue
-│   │       ├── football_data.py     # football-data.org API client
-│   │       ├── odds.py              # The Odds API client
-│   │       └── prediction_cache.py  # In-memory pre-kickoff cache
-│   └── requirements.txt
-└── frontend/
-    └── src/
-        ├── App.jsx                  # Layout, routing, filter bar, sidebar
-        ├── components/
-        │   ├── FixtureCard.jsx      # Per-fixture card with all panels
-        │   ├── ScoreHeatmap.jsx     # 9×9 probability heatmap
-        │   ├── Tipp11Heatmap.jsx    # Expected-points heatmap
-        │   ├── Tipp11Summary.jsx    # Round summary table
-        │   ├── OddsComparison.jsx   # Bookmaker odds + edge
-        │   ├── AccuracySummary.jsx  # Matchday accuracy stats
-        │   ├── LeagueTable.jsx      # Standings + projected totals
-        │   └── CalibrationView.jsx  # Brier/log-loss charts + ablation table
-        └── utils/
-            ├── tipp11.js            # Scoring logic + expected-points matrix
-            └── blendOdds.js         # 50/50 model + bookmaker blend
-```
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/health` | Model status and team count |
+| `GET /api/predictions/upcoming` | Predictions for upcoming fixtures (`?model_variant=bayes` for the bookmaker-prior variant) |
+| `GET /api/predictions/match` | Ad-hoc prediction (`?home_team=X&away_team=Y`) |
+| `GET /api/fixtures/upcoming` | Raw fixture list |
+| `GET /api/table` | League table + model-projected standings |
+| `GET /api/calibration` | Brier score, log-loss, per-matchday breakdown, ablation variants |
+| `GET /api/backtest` | Walk-forward backtest results (computed lazily on first request) |
 
 ---
 
@@ -231,5 +107,5 @@ bundesliga-predictor/
 |----------|---------|-------------|
 | `FOOTBALL_DATA_API_KEY` | — | Required |
 | `ODDS_API_KEY` | — | Required |
-| `seasons_to_fetch` | `3` | Seasons of historical Bundesliga data |
-| `time_decay_half_life_days` | `90` | Exponential weighting half-life |
+| `seasons_to_fetch` | `3` | Seasons of historical data used for model fitting |
+| `time_decay_half_life_days` | `90` | Exponential weighting half-life for recent matches |
