@@ -1,55 +1,29 @@
-.odds-table {
-  font-size: 0.78rem;
-  min-width: 260px;
-}
+.odds-table       { font-size: var(--text-sm); min-width: 240px; }
+.odds-bookmaker   { color: var(--text-secondary); margin-bottom: 0.35rem; font-size: var(--text-xs); }
 
-.odds-bookmaker {
-  color: #888;
-  margin-bottom: 0.4rem;
-  font-size: 0.72rem;
-}
-
-.odds-table table {
-  border-collapse: collapse;
-  width: 100%;
-}
+.odds-table table { border-collapse: collapse; width: 100%; }
 
 .odds-table th {
   text-align: left;
-  color: #777;
-  font-weight: 500;
-  padding: 0.2rem 0.4rem;
-  border-bottom: 1px solid #313150;
-}
-
-.odds-table td {
-  padding: 0.25rem 0.4rem;
-  color: #ccc;
-}
-
-.odds-table tr.value-row td {
-  color: #fff;
+  color: var(--text-muted);
   font-weight: 600;
+  font-size: var(--text-xxs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.2rem 0.4rem;
+  border-bottom: 1px solid var(--border-subtle);
 }
+
+.odds-table td             { padding: 0.22rem 0.4rem; color: var(--text-secondary); }
+.odds-table tr.value-row td { color: var(--text-primary); font-weight: 600; }
 
 .edge-badge {
-  padding: 1px 6px;
-  border-radius: 4px;
-  font-size: 0.72rem;
+  padding: 1px 5px;
+  border-radius: var(--r-xs);
+  font-size: var(--text-xxs);
   font-weight: 600;
 }
 
-.edge-badge.positive {
-  background: #1a3a1a;
-  color: #4caf50;
-}
-
-.edge-badge.negative {
-  background: #3a1a1a;
-  color: #f44336;
-}
-
-.edge-badge.neutral {
-  background: #2a2a3a;
-  color: #aaa;
-}
+.edge-badge.positive { background: rgba(76,175,80,0.15);  color: var(--green); }
+.edge-badge.negative { background: rgba(239,83,80,0.12);  color: var(--red); }
+.edge-badge.neutral  { background: var(--border-subtle);  color: var(--text-secondary); }

@@ -2,9 +2,53 @@
   box-sizing: border-box;
 }
 
+/* ── Design tokens ─────────────────────────────────────────────────── */
+:root {
+  /* Backgrounds */
+  --bg-app:       #11111d;
+  --bg-card:      #1c1c2e;
+  --bg-card-alt:  #181828;
+  --bg-input:     #181828;
+  --bg-hover:     #22223a;
+
+  /* Borders */
+  --border:       #2a2a44;
+  --border-subtle:#1a1a32;
+
+  /* Text */
+  --text-primary:   #e2e2f4;
+  --text-secondary: #888;
+  --text-muted:     #555;
+  --text-dimmed:    #3a3a58;
+
+  /* Semantic colours */
+  --green:   #4caf50;
+  --red:     #ef5350;
+  --yellow:  #f5c518;
+  --purple:  #6c63ff;
+  --blue:    #1e88e5;
+  --orange:  #ff9800;
+
+  /* Radius */
+  --r-card: 10px;
+  --r-btn:   6px;
+  --r-sm:    4px;
+  --r-xs:    3px;
+
+  /* Font scale */
+  --text-xl:   1.5rem;
+  --text-lg:   1rem;
+  --text-md:   0.82rem;
+  --text-sm:   0.72rem;
+  --text-xs:   0.64rem;
+  --text-xxs:  0.58rem;
+}
+
 body {
   margin: 0;
-  background: #12121e;
+  background: var(--bg-app);
+  color: var(--text-primary);
+  font-family: system-ui, 'Segoe UI', sans-serif;
 }
 
 #root {

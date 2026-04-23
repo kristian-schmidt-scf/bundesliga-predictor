@@ -239,6 +239,7 @@ export default function App() {
 
           {groups.length > 0 && (
             <div className="filter-bar">
+              {/* Group 1: data selection */}
               <div className="filter-group">
                 <label htmlFor="matchday-select">Spieltag</label>
                 <select
@@ -254,44 +255,53 @@ export default function App() {
               </div>
 
               <button
-                className={`live-btn${liveOnly ? ' active' : ''}${liveCount === 0 ? ' disabled' : ''}`}
+                className={`filter-btn${liveOnly ? ' active' : ''}${liveCount === 0 ? ' disabled' : ''}`}
                 onClick={() => { if (liveCount > 0) setLiveOnly(v => !v) }}
               >
                 <span className={`live-dot${liveCount > 0 ? ' pulsing' : ''}`} />
                 Live{liveCount > 0 ? ` (${liveCount})` : ''}
               </button>
 
+              <div className="filter-separator" />
+
+              {/* Group 2: analysis overlays */}
               <button
-                className={`live-btn${showTipp11 ? ' active' : ''}`}
+                className={`filter-btn${showTipp11 ? ' active' : ''}`}
                 onClick={() => setShowTipp11(v => !v)}
               >
                 Tipp 11
               </button>
 
               <button
-                className={`live-btn${blendOdds ? ' active' : ''}`}
+                className={`filter-btn${blendOdds ? ' active' : ''}`}
                 onClick={() => setBlendOdds(v => !v)}
                 title="Blend Dixon-Coles (50%) with bookmaker implied probabilities (50%)"
               >
-                + Bookmaker Odds
+                Blend odds
               </button>
 
+              <div className="filter-separator" />
+
+              {/* Group 3: view switches */}
               <button
-                className={`live-btn${showTable ? ' active' : ''}`}
+                className={`filter-btn${showTable ? ' view-active' : ''}`}
                 onClick={() => setShowTable(v => !v)}
               >
                 Table
               </button>
 
               <button
-                className={`live-btn${showCalibration ? ' active' : ''}`}
+                className={`filter-btn${showCalibration ? ' view-active' : ''}`}
                 onClick={() => setShowCalibration(v => !v)}
               >
                 Calibration
               </button>
 
+              <div className="filter-separator" />
+
+              {/* Group 4: model selector */}
               <button
-                className={`live-btn model-toggle${modelVariant === 'bayes' ? ' active' : ''}`}
+                className={`filter-btn${modelVariant === 'bayes' ? ' model-active' : ''}`}
                 onClick={() => setModelVariant(v => v === 'base' ? 'bayes' : 'base')}
                 title="Toggle between base Dixon-Coles and Bayesian prior model"
               >
