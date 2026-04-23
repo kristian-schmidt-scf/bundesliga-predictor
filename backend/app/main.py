@@ -20,6 +20,9 @@ from app.config import settings
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Keep strong references to background tasks so they aren't garbage-collected
+_bg_tasks: set = set()
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -65,11 +68,13 @@ async def lifespan(app: FastAPI):
             logger.warning(f"Bayesian model fitting failed: {e} — Bayes predictions unavailable.")
 
         # Start walk-forward backtest as a non-blocking background task.
-        # Only needs historical + current — zero extra API calls.
-        asyncio.create_task(backtest_service.compute_backtest(
+        # Store a strong reference so the task isn't garbage-collected.
+        task = asyncio.create_task(backtest_service.compute_backtest(
             historical=historical,
             current_all=current,
         ))
+        _bg_tasks.add(task)
+        task.add_done_callback(_bg_tasks.discard)
         logger.info("=== Backtest started in background (Spieltage 18–30) ===")
 
     except Exception as e:
