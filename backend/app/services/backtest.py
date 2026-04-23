@@ -23,6 +23,17 @@ BACKTEST_TO   = 30
 
 _cache: dict | None = None
 _computing: bool = False
+_attempted: bool = False
+
+# Startup data stored here so the lazy trigger makes zero API calls
+_prefetched_historical: list[dict] | None = None
+_prefetched_current:    list[dict] | None = None
+
+
+def set_prefetched_data(historical: list[dict], current_all: list[dict]) -> None:
+    global _prefetched_historical, _prefetched_current
+    _prefetched_historical = historical
+    _prefetched_current    = current_all
 
 
 # ---------------------------------------------------------------------------
@@ -72,6 +83,8 @@ async def compute_backtest(
     historical: list[dict] | None = None,
     current_all: list[dict] | None = None,
 ) -> None:
+    global _attempted
+    _attempted = True
     """
     Run walk-forward backtest and store result in module cache.
     Uses only historical + current_all (both available from startup data),
@@ -82,6 +95,11 @@ async def compute_backtest(
     logger.info(f"=== Backtest: starting walk-forward for Spieltage {BACKTEST_FROM}–{BACKTEST_TO} ===")
 
     try:
+        if historical is None:
+            historical = _prefetched_historical
+        if current_all is None:
+            current_all = _prefetched_current
+        # Only fall back to API if prefetched data wasn't set (shouldn't happen in normal startup)
         if historical is None:
             historical = await football_data.get_historical_results(settings.seasons_to_fetch)
         if current_all is None:

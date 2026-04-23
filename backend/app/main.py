@@ -41,6 +41,9 @@ async def lifespan(app: FastAPI):
         model.fit(all_results)
         logger.info("=== Base model ready ===")
 
+        # Store data for backtest lazy trigger — no extra API calls needed
+        backtest_service.set_prefetched_data(historical, current)
+
         # 2. Bayesian model — use current bookmaker odds as MAP prior
         logger.info("=== Startup: fitting Bayesian prior model ===")
         try:

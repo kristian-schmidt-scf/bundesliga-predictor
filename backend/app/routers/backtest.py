@@ -17,7 +17,7 @@ async def get_backtest():
     result = backtest_service.get_result()
 
     # Lazily kick off computation on first request if not already running/done
-    if result["status"] == "unavailable" and not backtest_service._computing:
+    if result["status"] == "unavailable" and not backtest_service._computing and not backtest_service._attempted:
         task = asyncio.create_task(backtest_service.compute_backtest())
         _task_ref.add(task)
         task.add_done_callback(_task_ref.discard)
