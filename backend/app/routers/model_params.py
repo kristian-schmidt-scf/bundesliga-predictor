@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from app.services.dixon_coles import get_model, get_model_bayes, PRIOR_STRENGTH
+from app.services import football_data
 from app.models.schemas import ModelParamsResponse, TeamParams
 
 router = APIRouter(prefix="/model-params", tags=["model-params"])
@@ -7,15 +8,22 @@ router = APIRouter(prefix="/model-params", tags=["model-params"])
 
 @router.get("", response_model=ModelParamsResponse)
 async def get_model_params():
-    """Returns fitted attack, defence, home advantage, and form parameters for both models."""
+    """Returns fitted parameters for teams active in the current Bundesliga season."""
     model = get_model()
     if not model.fitted:
         raise HTTPException(status_code=503, detail="Base model not yet fitted.")
 
     bayes = get_model_bayes()
 
+    # Only show teams currently in the Bundesliga
+    fixtures = await football_data.get_current_and_upcoming_fixtures()
+    current_teams = set()
+    for f in fixtures:
+        current_teams.add(f.home_team.name)
+        current_teams.add(f.away_team.name)
+
     teams_out = []
-    for team in sorted(model.teams):
+    for team in sorted(t for t in model.teams if t in current_teams):
         entry = TeamParams(
             team=team,
             alpha_base=round(model.alphas.get(team, 0.0), 4),
