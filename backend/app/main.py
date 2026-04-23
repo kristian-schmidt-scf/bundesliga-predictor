@@ -7,7 +7,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 
-from app.routers import fixtures, predictions, table, calibration, model_params
+from app.routers import fixtures, predictions, table, calibration, model_params, backtest as backtest_router
+from app.services import backtest as backtest_service
+import asyncio
 from app.services.dixon_coles import get_model, get_model_bayes
 from app.services.football_data import (
     get_historical_results, get_current_season_results, get_current_and_upcoming_fixtures
@@ -62,6 +64,10 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"Bayesian model fitting failed: {e} — Bayes predictions unavailable.")
 
+        # Start walk-forward backtest as a non-blocking background task
+        asyncio.create_task(backtest_service.compute_backtest())
+        logger.info("=== Backtest started in background (Spieltage 18–30) ===")
+
     except Exception as e:
         logger.error(f"Model fitting failed on startup: {e}")
         logger.warning("Server is running but predictions may be unavailable.")
@@ -89,6 +95,7 @@ app.include_router(predictions.router, prefix="/api")
 app.include_router(table.router, prefix="/api")
 app.include_router(calibration.router, prefix="/api")
 app.include_router(model_params.router, prefix="/api")
+app.include_router(backtest_router.router, prefix="/api")
 
 
 @app.get("/api/health")

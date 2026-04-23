@@ -7,6 +7,27 @@ from datetime import datetime
 # Model parameters
 # ---------------------------------------------------------------------------
 
+class BacktestMatchday(BaseModel):
+    matchday: int
+    fixtures: int
+    brier_score: float
+    log_loss: float
+    tendency_accuracy: float
+    tipp11_expected: float
+    tipp11_actual: float
+
+
+class BacktestResult(BaseModel):
+    status: str                          # "ready" | "computing" | "unavailable"
+    matchdays_tested: int = 0
+    brier_score: float = 0.0
+    log_loss: float = 0.0
+    tendency_accuracy: float = 0.0
+    tipp11_expected: float = 0.0
+    tipp11_actual: float = 0.0
+    per_matchday: list[BacktestMatchday] = []
+
+
 class TeamParams(BaseModel):
     team: str
     alpha_base: float

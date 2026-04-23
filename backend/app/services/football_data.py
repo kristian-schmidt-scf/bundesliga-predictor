@@ -121,6 +121,7 @@ async def get_current_season_results() -> list[dict]:
             "home_goals": int(home_goals),
             "away_goals": int(away_goals),
             "date": match["utcDate"],
+            "matchday": match.get("matchday", 0),
         })
     return results
 
