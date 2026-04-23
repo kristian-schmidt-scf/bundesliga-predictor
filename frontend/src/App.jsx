@@ -5,6 +5,7 @@ import LeagueTable from './components/LeagueTable'
 import AccuracySummary from './components/AccuracySummary'
 import Tipp11Summary from './components/Tipp11Summary'
 import CalibrationView from './components/CalibrationView'
+import BacktestView from './components/BacktestView'
 import { blendScoreMatrix } from './utils/blendOdds'
 import { bestTipp11Tip } from './utils/tipp11'
 import './App.css'
@@ -134,6 +135,7 @@ export default function App() {
   const [blendOdds, setBlendOdds] = useState(false)
   const [showTable, setShowTable] = useState(false)
   const [showCalibration, setShowCalibration] = useState(false)
+  const [showBacktest, setShowBacktest] = useState(false)
   const [modelVariant, setModelVariant] = useState('base')
   const [bayesPredictions, setBayesPredictions] = useState([])
   const [loading, setLoading] = useState(true)
@@ -228,8 +230,8 @@ export default function App() {
     <div className="app">
       <AppHeader />
 
-      <div className={`app-body${showTable || showCalibration ? ' no-sidebar' : ''}`}>
-        {visiblePredictions.length > 0 && !showTable && !showCalibration && (
+      <div className={`app-body${showTable || showCalibration || showBacktest ? ' no-sidebar' : ''}`}>
+        {visiblePredictions.length > 0 && !showTable && !showCalibration && !showBacktest && (
           <MatchupSidebar predictions={visiblePredictions} onSelect={scrollToFixture} blendOdds={blendOdds} />
         )}
 
@@ -297,6 +299,13 @@ export default function App() {
                 Calibration
               </button>
 
+              <button
+                className={`filter-btn${showBacktest ? ' view-active' : ''}`}
+                onClick={() => setShowBacktest(v => !v)}
+              >
+                Backtest
+              </button>
+
               <div className="filter-separator" />
 
               {/* Group 4: model selector */}
@@ -335,8 +344,8 @@ export default function App() {
             </div>
           )}
 
-          {!showTable && !showCalibration && <AccuracySummary predictions={visiblePredictions} />}
-          {!showTable && !showCalibration && showTipp11 && (
+          {!showTable && !showCalibration && !showBacktest && <AccuracySummary predictions={visiblePredictions} />}
+          {!showTable && !showCalibration && !showBacktest && showTipp11 && (
             <Tipp11Summary
               predictions={visiblePredictions}
               bayesPredictions={bayesPredictions}
@@ -344,7 +353,9 @@ export default function App() {
             />
           )}
 
-          {showCalibration ? (
+          {showBacktest ? (
+            <BacktestView />
+          ) : showCalibration ? (
             <CalibrationView />
           ) : showTable ? (
             <LeagueTable />

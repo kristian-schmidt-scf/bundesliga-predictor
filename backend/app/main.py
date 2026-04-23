@@ -7,7 +7,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 
-from app.routers import fixtures, predictions, table, calibration, model_params
+from app.routers import fixtures, predictions, table, calibration, model_params, backtest as backtest_router
+from app.services import backtest as backtest_service
+import asyncio
 from app.services.dixon_coles import get_model, get_model_bayes
 from app.services.football_data import (
     get_historical_results, get_current_season_results, get_current_and_upcoming_fixtures
@@ -17,6 +19,9 @@ from app.config import settings
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Keep strong references to background tasks so they aren't garbage-collected
+_bg_tasks: set = set()
 
 
 @asynccontextmanager
@@ -35,6 +40,9 @@ async def lifespan(app: FastAPI):
         model = get_model()
         model.fit(all_results)
         logger.info("=== Base model ready ===")
+
+        # Store data for backtest lazy trigger — no extra API calls needed
+        backtest_service.set_prefetched_data(historical, current)
 
         # 2. Bayesian model — use current bookmaker odds as MAP prior
         logger.info("=== Startup: fitting Bayesian prior model ===")
@@ -61,6 +69,8 @@ async def lifespan(app: FastAPI):
             logger.info("=== Bayesian prior model ready ===")
         except Exception as e:
             logger.warning(f"Bayesian model fitting failed: {e} — Bayes predictions unavailable.")
+
+        # Backtest is triggered lazily on first GET /api/backtest request
 
     except Exception as e:
         logger.error(f"Model fitting failed on startup: {e}")
@@ -89,6 +99,7 @@ app.include_router(predictions.router, prefix="/api")
 app.include_router(table.router, prefix="/api")
 app.include_router(calibration.router, prefix="/api")
 app.include_router(model_params.router, prefix="/api")
+app.include_router(backtest_router.router, prefix="/api")
 
 
 @app.get("/api/health")

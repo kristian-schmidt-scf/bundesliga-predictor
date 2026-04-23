@@ -27,9 +27,13 @@ async def get_bundesliga_odds() -> dict[str, MatchOdds]:
         "oddsFormat": settings.odds_format,
     }
 
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(url, params=params, timeout=10)
-        resp.raise_for_status()
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(url, params=params, timeout=15)
+            resp.raise_for_status()
+    except Exception as e:
+        logger.warning(f"Odds API unavailable ({type(e).__name__}) — serving predictions without odds")
+        return {}
 
     data = resp.json()
     odds_map: dict[str, MatchOdds] = {}
