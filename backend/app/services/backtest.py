@@ -68,16 +68,26 @@ def _best_tipp11_tip(matrix: list[list[float]]) -> tuple[int, int, float]:
 # Core backtest computation
 # ---------------------------------------------------------------------------
 
-async def compute_backtest() -> None:
-    """Run walk-forward backtest and store result in module cache."""
+async def compute_backtest(
+    historical: list[dict] | None = None,
+    current_all: list[dict] | None = None,
+    ruckrunde: list | None = None,
+) -> None:
+    """
+    Run walk-forward backtest and store result in module cache.
+    Pre-fetched data can be passed in to avoid extra API calls on startup.
+    """
     global _cache, _computing
     _computing = True
     logger.info(f"=== Backtest: starting walk-forward for Spieltage {BACKTEST_FROM}–{BACKTEST_TO} ===")
 
     try:
-        historical = await football_data.get_historical_results(settings.seasons_to_fetch)
-        current_all = await football_data.get_current_season_results()
-        ruckrunde  = await football_data.get_current_and_upcoming_fixtures()
+        if historical is None:
+            historical = await football_data.get_historical_results(settings.seasons_to_fetch)
+        if current_all is None:
+            current_all = await football_data.get_current_season_results()
+        if ruckrunde is None:
+            ruckrunde = await football_data.get_current_and_upcoming_fixtures()
 
         # Group Rückrunde fixtures by matchday
         by_md: dict[int, list] = {}
