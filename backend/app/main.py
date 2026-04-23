@@ -67,15 +67,7 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"Bayesian model fitting failed: {e} — Bayes predictions unavailable.")
 
-        # Start walk-forward backtest as a non-blocking background task.
-        # Store a strong reference so the task isn't garbage-collected.
-        task = asyncio.create_task(backtest_service.compute_backtest(
-            historical=historical,
-            current_all=current,
-        ))
-        _bg_tasks.add(task)
-        task.add_done_callback(_bg_tasks.discard)
-        logger.info("=== Backtest started in background (Spieltage 18–30) ===")
+        # Backtest is triggered lazily on first GET /api/backtest request
 
     except Exception as e:
         logger.error(f"Model fitting failed on startup: {e}")
