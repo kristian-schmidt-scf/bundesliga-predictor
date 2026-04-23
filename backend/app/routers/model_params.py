@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from app.services.dixon_coles import get_model, get_model_bayes, PRIOR_STRENGTH
-from app.services.football_data import get_standings
+from datetime import datetime, timezone
 from app.models.schemas import ModelParamsResponse, TeamParams
 
 router = APIRouter(prefix="/model-params", tags=["model-params"])
@@ -15,9 +15,16 @@ async def get_model_params():
 
     bayes = get_model_bayes()
 
-    # Use standings — the authoritative list of exactly 18 current Bundesliga teams
-    standings = await get_standings()
-    current_teams = {row["team_name"] for row in standings}
+    # Derive current-season teams from the model's training data (no API call needed).
+    # Matches played this calendar year belong to the current Bundesliga season.
+    current_year = str(datetime.now(timezone.utc).year)
+    h2h = model._h2h_df
+    if h2h is not None:
+        season_mask = h2h["date"].str.startswith(current_year)
+        season_df = h2h[season_mask]
+        current_teams = set(season_df["home_team"]) | set(season_df["away_team"])
+    else:
+        current_teams = set(model.teams)
 
     teams_out = []
     for team in sorted(t for t in model.teams if t in current_teams):
