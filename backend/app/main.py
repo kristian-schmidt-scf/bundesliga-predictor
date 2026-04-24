@@ -138,6 +138,9 @@ def _start_background(coro) -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from pathlib import Path
+    odds_history.init(Path(__file__).parent.parent / settings.odds_db_path)
+
     logger.info("=== Startup: fitting Dixon-Coles models ===")
     try:
         static     = load_historical_data()
