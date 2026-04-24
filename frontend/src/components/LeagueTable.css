@@ -102,6 +102,19 @@
 .zb-playoff { background: var(--red); opacity: 0.75; }
 .zb-rel     { background: #b71c1c; }
 
+.team-name-btn {
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+  text-decoration: underline dotted rgba(255,255,255,0.25);
+  transition: color 0.15s;
+}
+.team-name-btn:hover { color: var(--purple); }
+
 /* Form pips */
 .form-pips { display: flex; gap: 2px; justify-content: flex-end; }
 .pip { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }

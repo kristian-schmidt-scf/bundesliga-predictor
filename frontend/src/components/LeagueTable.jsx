@@ -65,7 +65,7 @@ function ZoneBar({ sim }) {
   )
 }
 
-export default function LeagueTable() {
+export default function LeagueTable({ onTeamClick }) {
   const [table, setTable]     = useState([])
   const [simMap, setSimMap]   = useState({})
   const [loading, setLoading] = useState(true)
@@ -147,7 +147,7 @@ export default function LeagueTable() {
               <td className="col-pos">{row.position}</td>
               <td className="col-team">
                 {row.team.crest_url && <img src={row.team.crest_url} className="table-crest" alt="" />}
-                <span>{row.team.short_name}</span>
+                <button className="team-name-btn" onClick={() => onTeamClick?.(row.team.name)}>{row.team.short_name}</button>
               </td>
               <td>{row.played}</td>
               <td>{row.won}</td>

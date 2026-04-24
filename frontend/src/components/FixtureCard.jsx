@@ -23,7 +23,7 @@ function restLabel(days) {
   return { text: `${days}d`, cls: 'rest-normal' }
 }
 
-export default function FixtureCard({ prediction, showTipp11, blendOdds }) {
+export default function FixtureCard({ prediction, showTipp11, blendOdds, onTeamClick }) {
   const { fixture, win_probabilities, expected_home_goals, expected_away_goals, most_likely_score, score_matrix, odds, edge_home_win, edge_draw, edge_away_win,
     rest_days_home, rest_days_away, travel_km } = prediction
 
@@ -58,7 +58,7 @@ export default function FixtureCard({ prediction, showTipp11, blendOdds }) {
       <div className="teams-row">
         <div className="team home">
           {home_team.crest_url && <img src={home_team.crest_url} alt="" className="crest" />}
-          <span>{home_team.name}</span>
+          <button className="team-name-btn" onClick={() => onTeamClick?.(home_team.name)}>{home_team.name}</button>
         </div>
         <div className="vs-block">
           {actualScore ? (
@@ -86,7 +86,7 @@ export default function FixtureCard({ prediction, showTipp11, blendOdds }) {
         </div>
         <div className="team away">
           {away_team.crest_url && <img src={away_team.crest_url} alt="" className="crest" />}
-          <span>{away_team.name}</span>
+          <button className="team-name-btn" onClick={() => onTeamClick?.(away_team.name)}>{away_team.name}</button>
         </div>
       </div>
 

@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 
-from app.routers import fixtures, predictions, table, calibration, model_params, backtest as backtest_router, simulation as simulation_router
+from app.routers import fixtures, predictions, table, calibration, model_params, backtest as backtest_router, simulation as simulation_router, teams as teams_router
 from app.services import backtest as backtest_service
 import asyncio
 from app.services.dixon_coles import get_model, get_model_bayes
@@ -117,6 +117,7 @@ app.include_router(calibration.router, prefix="/api")
 app.include_router(model_params.router, prefix="/api")
 app.include_router(backtest_router.router, prefix="/api")
 app.include_router(simulation_router.router, prefix="/api")
+app.include_router(teams_router.router, prefix="/api")
 
 
 @app.get("/api/health")
