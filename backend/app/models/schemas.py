@@ -157,6 +157,26 @@ class TableEntry(BaseModel):
     projected_total: float = 0.0
 
 
+class TeamSimResult(BaseModel):
+    team_name: str
+    team_id: int
+    p_cl: float
+    p_el: float
+    p_ecl: float
+    p_playoff: float
+    p_relegated: float
+    median_points: float
+    p10_points: float
+    p90_points: float
+
+
+class SimulationResult(BaseModel):
+    status: str
+    n_simulations: int
+    n_remaining: int
+    teams: list[TeamSimResult]
+
+
 class Prediction(BaseModel):
     fixture: Fixture
     score_matrix: ScoreMatrix

@@ -65,6 +65,43 @@
 .pos { color: var(--green); }
 .neg { color: var(--red); }
 
+/* Finish-zones column */
+.col-finish { min-width: 120px; padding-left: 0.75rem; }
+
+.zone-bar {
+  display: flex;
+  height: 14px;
+  border-radius: 3px;
+  overflow: hidden;
+  width: 100%;
+  min-width: 100px;
+}
+
+.zone-bar-placeholder { color: var(--text-muted); font-size: var(--text-xxs); }
+
+.zb-seg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  transition: width 0.3s ease;
+}
+
+.zb-label {
+  font-size: 9px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.9);
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.zb-cl      { background: var(--blue); }
+.zb-el      { background: var(--orange); }
+.zb-ecl     { background: var(--green); }
+.zb-safe    { background: var(--border); }
+.zb-playoff { background: var(--red); opacity: 0.75; }
+.zb-rel     { background: #b71c1c; }
+
 /* Form pips */
 .form-pips { display: flex; gap: 2px; justify-content: flex-end; }
 .pip { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
