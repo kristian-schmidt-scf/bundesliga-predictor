@@ -32,5 +32,11 @@ class Settings(BaseSettings):
     # Time decay half-life in days (recent matches weighted more)
     time_decay_half_life_days: int = 90
 
+    # Scheduled tasks
+    # Hour of day (local time, 0-23) to run the daily model refit
+    refit_hour: int = 6
+    # Interval between odds snapshot polls in seconds (default 2h; free tier has 500 req/month)
+    odds_poll_interval_seconds: int = 7200
+
 
 settings = Settings()

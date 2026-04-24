@@ -109,6 +109,7 @@ export default function FixtureCard({ prediction, showTipp11, blendOdds, onTeamC
         {showTipp11 && <Tipp11Heatmap matrix={effectiveMatrix} />}
         {odds && (
           <OddsComparison
+            fixtureId={fixture.id}
             odds={odds}
             winProbabilities={win_probabilities}
             edges={{ home: edge_home_win, draw: edge_draw, away: edge_away_win }}

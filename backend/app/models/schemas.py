@@ -223,6 +223,35 @@ class TeamProfileResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Odds movement
+# ---------------------------------------------------------------------------
+
+class OddsSnapshot(BaseModel):
+    timestamp: str
+    home_win: Optional[float] = None
+    draw: Optional[float] = None
+    away_win: Optional[float] = None
+    implied_home_prob: Optional[float] = None
+    implied_draw_prob: Optional[float] = None
+    implied_away_prob: Optional[float] = None
+
+
+class OddsMovement(BaseModel):
+    direction: str   # "shortened" | "lengthened" | "stable"
+    delta: float     # change in implied probability (positive = more likely)
+
+
+class OddsHistoryResponse(BaseModel):
+    fixture_id: int
+    snapshots: list[OddsSnapshot]
+    opening: Optional[OddsSnapshot] = None
+    current: Optional[OddsSnapshot] = None
+    movement_home: Optional[OddsMovement] = None
+    movement_draw: Optional[OddsMovement] = None
+    movement_away: Optional[OddsMovement] = None
+
+
+# ---------------------------------------------------------------------------
 # Head-to-head
 # ---------------------------------------------------------------------------
 
