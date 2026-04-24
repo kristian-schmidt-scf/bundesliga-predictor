@@ -29,7 +29,7 @@ MAX_GOALS = 8  # We compute P(i, j) for i,j in 0..MAX_GOALS
 
 
 # ---------------------------------------------------------------------------
-# Stadium coordinates (WGS-84 lat/lon) — covers all teams from last 3 seasons
+# Stadium coordinates (WGS-84 lat/lon) — covers current + 10 seasons of history
 # ---------------------------------------------------------------------------
 
 STADIUM_COORDS: dict[str, tuple[float, float]] = {
@@ -57,6 +57,15 @@ STADIUM_COORDS: dict[str, tuple[float, float]] = {
     "FC Schalke 04":             (51.5546,  7.0680),
     "Hertha BSC":                (52.5145, 13.2394),
     "SpVgg Greuther Fürth":      (49.4797, 10.9783),
+    # Historical teams (2016/17 – 2022/23)
+    "Hannover 96":               (52.3603,  9.7330),
+    "1. FC Nürnberg":            (49.4278, 11.1224),
+    "Fortuna Düsseldorf":        (51.2744,  6.7738),
+    "FC Ingolstadt 04":          (48.7519, 11.4233),
+    "SC Paderborn 07":           (51.7180,  8.7462),
+    "Arminia Bielefeld":         (52.0386,  8.5239),
+    "Eintracht Braunschweig":    (52.2750, 10.5270),
+    "1. FC Kaiserslautern":      (49.4358,  7.7773),
 }
 
 # ---------------------------------------------------------------------------
@@ -354,7 +363,7 @@ class DixonColesModel:
             x0,
             args=(df, self.teams, weights, team_idx),
             method="L-BFGS-B",
-            options={"maxiter": 500, "ftol": 1e-9},
+            options={"maxiter": 2000, "ftol": 1e-9},
         )
 
         if not result.success:
@@ -450,7 +459,7 @@ class DixonColesModel:
             x0,
             args=(df, self.teams, weights, team_idx, prior_constraints, prior_strength),
             method="L-BFGS-B",
-            options={"maxiter": 500, "ftol": 1e-9},
+            options={"maxiter": 2000, "ftol": 1e-9},
         )
 
         if not result.success:

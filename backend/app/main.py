@@ -14,6 +14,7 @@ from app.services.dixon_coles import get_model, get_model_bayes
 from app.services.football_data import (
     get_historical_results, get_current_season_results, get_current_and_upcoming_fixtures
 )
+from app.services.historical_data import load_historical_data
 from app.services.odds import get_bundesliga_odds, find_odds_for_fixture
 from app.config import settings
 
@@ -32,9 +33,24 @@ async def lifespan(app: FastAPI):
     """
     logger.info("=== Startup: fitting Dixon-Coles models ===")
     try:
+        static     = load_historical_data()
         historical = await get_historical_results(settings.seasons_to_fetch)
         current    = await get_current_season_results()
-        all_results = historical + current
+
+        # Merge static + API data; deduplicate by (date, home, away) so that
+        # increasing seasons_to_fetch never causes duplicates with the static file.
+        seen: set[tuple] = set()
+        all_results: list[dict] = []
+        for match in historical + current + static:
+            key = (match["date"][:10], match["home_team"], match["away_team"])
+            if key not in seen:
+                seen.add(key)
+                all_results.append(match)
+
+        logger.info(
+            "Training data: %d API matches + %d static historical = %d total (after dedup)",
+            len(historical) + len(current), len(static), len(all_results),
+        )
 
         # 1. Base model — no bookmaker prior
         model = get_model()
