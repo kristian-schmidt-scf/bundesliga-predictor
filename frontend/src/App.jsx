@@ -6,6 +6,7 @@ import AccuracySummary from './components/AccuracySummary'
 import Tipp11Summary from './components/Tipp11Summary'
 import CalibrationView from './components/CalibrationView'
 import BacktestView from './components/BacktestView'
+import TeamProfile from './components/TeamProfile'
 import { blendScoreMatrix } from './utils/blendOdds'
 import { bestTipp11Tip } from './utils/tipp11'
 import './App.css'
@@ -140,6 +141,7 @@ export default function App() {
   const [bayesPredictions, setBayesPredictions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [profileTeam, setProfileTeam] = useState(null)
 
   useEffect(() => {
     axios.get(`/api/predictions/upcoming?model_variant=${modelVariant}`)
@@ -229,6 +231,7 @@ export default function App() {
   return (
     <div className="app">
       <AppHeader />
+      {profileTeam && <TeamProfile teamName={profileTeam} onClose={() => setProfileTeam(null)} />}
 
       <div className={`app-body${showTable || showCalibration || showBacktest ? ' no-sidebar' : ''}`}>
         {visiblePredictions.length > 0 && !showTable && !showCalibration && !showBacktest && (
@@ -358,7 +361,7 @@ export default function App() {
           ) : showCalibration ? (
             <CalibrationView />
           ) : showTable ? (
-            <LeagueTable />
+            <LeagueTable onTeamClick={setProfileTeam} />
           ) : (
             <>
               {visiblePredictions.length === 0 && !loading && (
@@ -369,7 +372,7 @@ export default function App() {
               <div className="fixture-list">
                 {visiblePredictions.map(p => (
                   <div key={p.fixture.id} id={`fixture-${p.fixture.id}`}>
-                    <FixtureCard prediction={p} showTipp11={showTipp11} blendOdds={blendOdds} />
+                    <FixtureCard prediction={p} showTipp11={showTipp11} blendOdds={blendOdds} onTeamClick={setProfileTeam} />
                   </div>
                 ))}
               </div>

@@ -177,6 +177,51 @@ class SimulationResult(BaseModel):
     teams: list[TeamSimResult]
 
 
+# ---------------------------------------------------------------------------
+# Team profile
+# ---------------------------------------------------------------------------
+
+class TeamSeasonResult(BaseModel):
+    date: str
+    matchday: Optional[int]
+    home_team: str
+    away_team: str
+    home_goals: int
+    away_goals: int
+
+
+class TeamUpcomingFixture(BaseModel):
+    fixture_id: int
+    date: str
+    matchday: int
+    home_team: str
+    away_team: str
+    home_win_prob: float
+    draw_prob: float
+    away_win_prob: float
+    expected_home_goals: float
+    expected_away_goals: float
+
+
+class TeamProfileResponse(BaseModel):
+    team: str
+    alpha: float
+    delta: float
+    gamma: float
+    form: float
+    avg_alpha: float
+    avg_delta: float
+    avg_gamma: float
+    avg_form: float
+    alpha_bayes: Optional[float] = None
+    delta_bayes: Optional[float] = None
+    gamma_bayes: Optional[float] = None
+    form_bayes: Optional[float] = None
+    bayes_fitted: bool
+    season_results: list[TeamSeasonResult]
+    upcoming: list[TeamUpcomingFixture]
+
+
 class Prediction(BaseModel):
     fixture: Fixture
     score_matrix: ScoreMatrix

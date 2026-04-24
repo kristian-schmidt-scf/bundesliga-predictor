@@ -50,6 +50,18 @@
 
 .team.away { flex-direction: row-reverse; text-align: right; }
 
+.team .team-name-btn {
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline dotted rgba(255,255,255,0.2);
+  transition: color 0.15s;
+}
+.team .team-name-btn:hover { color: var(--purple); }
+
 .crest { width: 26px; height: 26px; object-fit: contain; }
 
 .vs-block {
