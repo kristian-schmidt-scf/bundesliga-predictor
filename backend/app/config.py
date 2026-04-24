@@ -38,5 +38,8 @@ class Settings(BaseSettings):
     # Interval between odds snapshot polls in seconds (default 2h; free tier has 500 req/month)
     odds_poll_interval_seconds: int = 7200
 
+    # Odds history persistence
+    odds_db_path: str = "odds_history.db"  # relative to the backend/ directory
+
 
 settings = Settings()
