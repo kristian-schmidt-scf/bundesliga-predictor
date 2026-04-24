@@ -71,3 +71,41 @@
 }
 
 .t11s-total .t11s-xpts { color: var(--purple); }
+
+/* Your pick column */
+.t11s-my-pick-hdr { color: var(--yellow); }
+
+.t11s-my-pick-cell { white-space: nowrap; }
+
+.pick-input-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.pick-input {
+  width: 2.4rem;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xs);
+  color: var(--text-primary);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  padding: 0.15rem 0.25rem;
+  text-align: center;
+  -moz-appearance: textfield;
+}
+
+.pick-input::-webkit-outer-spin-button,
+.pick-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+
+.pick-input:focus {
+  outline: none;
+  border-color: var(--yellow);
+}
+
+.pick-sep {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}

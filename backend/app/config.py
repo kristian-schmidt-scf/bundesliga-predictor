@@ -41,5 +41,8 @@ class Settings(BaseSettings):
     # Odds history persistence
     odds_db_path: str = "odds_history.db"  # relative to the backend/ directory
 
+    # User Tipp 11 picks persistence
+    picks_db_path: str = "user_picks.db"  # relative to the backend/ directory
+
 
 settings = Settings()

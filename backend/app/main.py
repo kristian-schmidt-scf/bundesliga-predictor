@@ -9,9 +9,9 @@ from fastapi.middleware.cors import CORSMiddleware
 import asyncio
 import logging
 
-from app.routers import fixtures, predictions, table, calibration, model_params, backtest as backtest_router, simulation as simulation_router, teams as teams_router, h2h as h2h_router, odds as odds_router
+from app.routers import fixtures, predictions, table, calibration, model_params, backtest as backtest_router, simulation as simulation_router, teams as teams_router, h2h as h2h_router, odds as odds_router, picks as picks_router
 from app.services import backtest as backtest_service
-from app.services import odds_history
+from app.services import odds_history, user_picks
 from app.services.dixon_coles import get_model, get_model_bayes
 from app.services.football_data import (
     get_historical_results, get_current_season_results, get_current_and_upcoming_fixtures
@@ -140,6 +140,7 @@ def _start_background(coro) -> None:
 async def lifespan(app: FastAPI):
     from pathlib import Path
     odds_history.init(Path(__file__).parent.parent / settings.odds_db_path)
+    user_picks.init(Path(__file__).parent.parent / settings.picks_db_path)
 
     logger.info("=== Startup: fitting Dixon-Coles models ===")
     try:
@@ -208,6 +209,7 @@ app.include_router(simulation_router.router, prefix="/api")
 app.include_router(teams_router.router, prefix="/api")
 app.include_router(h2h_router.router, prefix="/api")
 app.include_router(odds_router.router, prefix="/api")
+app.include_router(picks_router.router, prefix="/api")
 
 
 @app.get("/api/health")

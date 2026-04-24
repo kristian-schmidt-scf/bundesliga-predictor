@@ -223,6 +223,28 @@ class TeamProfileResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# User picks
+# ---------------------------------------------------------------------------
+
+class UserPick(BaseModel):
+    fixture_id: int
+    matchday: int
+    home_team: str
+    away_team: str
+    picked_home: int
+    picked_away: int
+    saved_at: str
+
+
+class UserPickRequest(BaseModel):
+    matchday: int
+    home_team: str
+    away_team: str
+    picked_home: int
+    picked_away: int
+
+
+# ---------------------------------------------------------------------------
 # Odds movement
 # ---------------------------------------------------------------------------
 
