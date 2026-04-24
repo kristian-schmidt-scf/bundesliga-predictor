@@ -1,6 +1,7 @@
 import ScoreHeatmap from './ScoreHeatmap'
 import OddsComparison from './OddsComparison'
 import Tipp11Heatmap from './Tipp11Heatmap'
+import H2HPanel from './H2HPanel'
 import { blendScoreMatrix, blendWinProbs } from '../utils/blendOdds'
 import './FixtureCard.css'
 
@@ -95,6 +96,13 @@ export default function FixtureCard({ prediction, showTipp11, blendOdds, onTeamC
         <ProbBar label="Draw" value={effectiveWinProbs.draw} />
         <ProbBar label={away_team.short_name} value={effectiveWinProbs.away_win} />
       </div>
+
+      <H2HPanel
+        homeTeam={home_team.name}
+        awayTeam={away_team.name}
+        homeShort={home_team.short_name}
+        awayShort={away_team.short_name}
+      />
 
       <div className="card-lower">
         <ScoreHeatmap matrix={effectiveMatrix} actualScore={actualScore} />

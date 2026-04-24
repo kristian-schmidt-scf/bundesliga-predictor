@@ -222,6 +222,28 @@ class TeamProfileResponse(BaseModel):
     upcoming: list[TeamUpcomingFixture]
 
 
+# ---------------------------------------------------------------------------
+# Head-to-head
+# ---------------------------------------------------------------------------
+
+class H2HMatch(BaseModel):
+    date: str
+    home_team: str
+    away_team: str
+    home_goals: int
+    away_goals: int
+    result: str   # HOME_WIN | DRAW | AWAY_WIN — relative to the requested home_team
+
+
+class H2HResponse(BaseModel):
+    home_team: str
+    away_team: str
+    matches: list[H2HMatch]
+    home_wins: int
+    draws: int
+    away_wins: int
+
+
 class Prediction(BaseModel):
     fixture: Fixture
     score_matrix: ScoreMatrix
