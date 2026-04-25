@@ -1,0 +1,24 @@
+{
+  "name": "Bundesliga Predictor",
+  "short_name": "BL Predict",
+  "description": "Dixon-Coles predictions and Tipp 11 assistant for Bundesliga fixtures",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#11111d",
+  "theme_color": "#11111d",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

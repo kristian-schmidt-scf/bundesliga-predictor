@@ -2,12 +2,35 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>frontend</title>
+
+    <title>Bundesliga Predictor</title>
+    <meta name="description" content="Dixon-Coles predictions and Tipp 11 assistant for Bundesliga fixtures" />
+
+    <!-- PWA manifest -->
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- Theme colour (browser chrome / status bar) -->
+    <meta name="theme-color" content="#11111d" />
+
+    <!-- iOS home screen -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="BL Predict" />
+    <link rel="apple-touch-icon" href="/icon.svg" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () =>
+          navigator.serviceWorker.register('/sw.js')
+        )
+      }
+    </script>
   </body>
 </html>

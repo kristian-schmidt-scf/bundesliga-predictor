@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" fill="#11111d"/>
+
+  <!-- German flag stripe (matches app header) -->
+  <rect x="156" y="64" width="200" height="13" rx="3" fill="#1e1e1e"/>
+  <rect x="156" y="77" width="200" height="13" rx="3" fill="#e8000f"/>
+  <rect x="156" y="90" width="200" height="13" rx="3" fill="#f5c518"/>
+
+  <!-- Lightning bolt (simplified, centred) -->
+  <path
+    fill="#6c63ff"
+    d="M300 128 L210 128 L168 270 L224 270 L192 384 L344 230 L284 230 Z"
+    opacity="0.95"
+  />
+
+  <!-- Subtle glow behind bolt -->
+  <path
+    fill="#6c63ff"
+    d="M300 128 L210 128 L168 270 L224 270 L192 384 L344 230 L284 230 Z"
+    opacity="0.18"
+    filter="url(#glow)"
+  />
+
+  <defs>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="18" result="blur"/>
+    </filter>
+  </defs>
+</svg>
