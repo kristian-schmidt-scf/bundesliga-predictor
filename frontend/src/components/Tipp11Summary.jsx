@@ -120,34 +120,37 @@ export default function Tipp11Summary({ predictions, bayesPredictions, useBlend 
     const { fixture } = p
     const { home_team, away_team, home_score, away_score, status, matchday } = fixture
     const isFinished = status === 'FINISHED' && home_score != null && away_score != null
+    const isLive     = status === 'IN_PLAY'  && home_score != null && away_score != null
+    const isResolved = isFinished || isLive
 
     const base  = getBestTip(p, useBlend)
     const bayes = hasBayes && bayesMap[fixture.id] ? getBestTip(bayesMap[fixture.id], useBlend) : null
 
-    const basePts  = isFinished ? computePoints(base.h,  base.a,  home_score, away_score) : null
-    const bayesPts = (isFinished && bayes) ? computePoints(bayes.h, bayes.a, home_score, away_score) : null
+    const basePts  = isResolved ? computePoints(base.h,  base.a,  home_score, away_score) : null
+    const bayesPts = (isResolved && bayes) ? computePoints(bayes.h, bayes.a, home_score, away_score) : null
 
     const pick    = picks[fixture.id] ?? null
-    const myPts   = (isFinished && pick) ? computePoints(pick.picked_home, pick.picked_away, home_score, away_score) : null
+    const myPts   = (isResolved && pick) ? computePoints(pick.picked_home, pick.picked_away, home_score, away_score) : null
 
     const oppPick = oppPicks[fixture.id] ?? null
-    const oppPts  = (isFinished && oppPick) ? computePoints(oppPick.picked_home, oppPick.picked_away, home_score, away_score) : null
+    const oppPts  = (isResolved && oppPick) ? computePoints(oppPick.picked_home, oppPick.picked_away, home_score, away_score) : null
 
-    return { fixture, home_team, away_team, matchday, base, bayes, basePts, bayesPts, isFinished, home_score, away_score, pick, myPts, oppPick, oppPts }
+    return { fixture, home_team, away_team, matchday, base, bayes, basePts, bayesPts, isFinished, isLive, isResolved, home_score, away_score, pick, myPts, oppPick, oppPts }
   })
 
-  const totalBaseExp  = rows.reduce((s, r) => s + r.base.pts, 0)
-  const totalBayesExp = hasBayes ? rows.reduce((s, r) => s + (r.bayes?.pts ?? 0), 0) : null
-  const finishedRows  = rows.filter(r => r.isFinished)
-  const totalBaseAct  = finishedRows.length > 0 ? finishedRows.reduce((s, r) => s + (r.basePts ?? 0), 0) : null
-  const totalBayesAct = (finishedRows.length > 0 && hasBayes) ? finishedRows.reduce((s, r) => s + (r.bayesPts ?? 0), 0) : null
-  const pickedFinished = finishedRows.filter(r => r.myPts !== null)
-  const totalMyAct    = pickedFinished.length > 0 ? pickedFinished.reduce((s, r) => s + r.myPts, 0) : null
+  const totalBaseExp   = rows.reduce((s, r) => s + r.base.pts, 0)
+  const totalBayesExp  = hasBayes ? rows.reduce((s, r) => s + (r.bayes?.pts ?? 0), 0) : null
+  const resolvedRows   = rows.filter(r => r.isResolved)
+  const totalBaseAct   = resolvedRows.length > 0 ? resolvedRows.reduce((s, r) => s + (r.basePts ?? 0), 0) : null
+  const totalBayesAct  = (resolvedRows.length > 0 && hasBayes) ? resolvedRows.reduce((s, r) => s + (r.bayesPts ?? 0), 0) : null
+  const pickedResolved = resolvedRows.filter(r => r.myPts !== null)
+  const totalMyAct     = pickedResolved.length > 0 ? pickedResolved.reduce((s, r) => s + r.myPts, 0) : null
 
-  const oppPickedFinished = finishedRows.filter(r => r.oppPts !== null)
-  const totalOppAct       = oppPickedFinished.length > 0 ? oppPickedFinished.reduce((s, r) => s + r.oppPts, 0) : null
+  const oppPickedResolved = resolvedRows.filter(r => r.oppPts !== null)
+  const totalOppAct       = oppPickedResolved.length > 0 ? oppPickedResolved.reduce((s, r) => s + r.oppPts, 0) : null
 
-  const showActual = finishedRows.length > 0
+  const anyLive    = resolvedRows.some(r => r.isLive)
+  const showActual = resolvedRows.length > 0
   const showResult = showActual
 
   return (
@@ -184,12 +187,16 @@ export default function Tipp11Summary({ predictions, bayesPredictions, useBlend 
                 </td>
               )}
               {showResult && (
-                <td className="t11s-result">{r.isFinished ? `${r.home_score}–${r.away_score}` : '–'}</td>
+                <td className={r.isLive ? 't11s-live-score' : 't11s-result'}>
+                  {r.isResolved
+                    ? <>{r.isLive && <span className="t11s-live-dot" />}{r.home_score}–{r.away_score}</>
+                    : '–'}
+                </td>
               )}
               <td className="t11s-xpts">{r.base.pts.toFixed(1)}</td>
               {hasBayes && <td className="t11s-xpts t11s-bayes-xpts">{r.bayes ? r.bayes.pts.toFixed(1) : '–'}</td>}
-              {showActual && <td className={r.isFinished ? `pts-${scoreClass(r.basePts)}` : 't11s-dash'}>{r.isFinished ? r.basePts : '–'}</td>}
-              {showActual && hasBayes && <td className={r.isFinished ? `pts-${scoreClass(r.bayesPts)}` : 't11s-dash'}>{r.isFinished ? r.bayesPts : '–'}</td>}
+              {showActual && <td className={r.isResolved ? `pts-${scoreClass(r.basePts)}${r.isLive ? ' pts-live' : ''}` : 't11s-dash'}>{r.isResolved ? r.basePts : '–'}</td>}
+              {showActual && hasBayes && <td className={r.isResolved ? `pts-${scoreClass(r.bayesPts)}${r.isLive ? ' pts-live' : ''}` : 't11s-dash'}>{r.isResolved ? r.bayesPts : '–'}</td>}
               <td className="t11s-my-pick-cell">
                 <PickInput
                   key={r.pick?.saved_at ?? 'empty'}
@@ -202,7 +209,7 @@ export default function Tipp11Summary({ predictions, bayesPredictions, useBlend 
                 />
               </td>
               {showActual && (
-                <td className={r.myPts !== null ? `pts-${scoreClass(r.myPts)}` : 't11s-dash'}>
+                <td className={r.myPts !== null ? `pts-${scoreClass(r.myPts)}${r.isLive ? ' pts-live' : ''}` : 't11s-dash'}>
                   {r.myPts !== null ? r.myPts : '–'}
                 </td>
               )}
@@ -219,7 +226,7 @@ export default function Tipp11Summary({ predictions, bayesPredictions, useBlend 
                 />
               </td>
               {showActual && (
-                <td className={r.oppPts !== null ? `pts-${scoreClass(r.oppPts)}` : 't11s-dash'}>
+                <td className={r.oppPts !== null ? `pts-${scoreClass(r.oppPts)}${r.isLive ? ' pts-live' : ''}` : 't11s-dash'}>
                   {r.oppPts !== null ? r.oppPts : '–'}
                 </td>
               )}
@@ -233,12 +240,12 @@ export default function Tipp11Summary({ predictions, bayesPredictions, useBlend 
             {showResult && <td />}
             <td className="t11s-xpts">{totalBaseExp.toFixed(1)}</td>
             {hasBayes && <td className="t11s-xpts t11s-bayes-xpts">{totalBayesExp?.toFixed(1) ?? '–'}</td>}
-            {showActual && <td className={totalBaseAct !== null ? `pts-${scoreClass(totalBaseAct)}` : ''}>{totalBaseAct ?? '–'}</td>}
-            {showActual && hasBayes && <td className={totalBayesAct !== null ? `pts-${scoreClass(totalBayesAct)}` : ''}>{totalBayesAct ?? '–'}</td>}
+            {showActual && <td className={totalBaseAct !== null ? `pts-${scoreClass(totalBaseAct)}${anyLive ? ' pts-live' : ''}` : ''}>{totalBaseAct ?? '–'}</td>}
+            {showActual && hasBayes && <td className={totalBayesAct !== null ? `pts-${scoreClass(totalBayesAct)}${anyLive ? ' pts-live' : ''}` : ''}>{totalBayesAct ?? '–'}</td>}
             <td />
-            {showActual && <td className={totalMyAct !== null ? `pts-${scoreClass(totalMyAct)}` : ''}>{totalMyAct ?? '–'}</td>}
+            {showActual && <td className={totalMyAct !== null ? `pts-${scoreClass(totalMyAct)}${anyLive ? ' pts-live' : ''}` : ''}>{totalMyAct ?? '–'}</td>}
             <td />
-            {showActual && <td className={totalOppAct !== null ? `pts-${scoreClass(totalOppAct)}` : ''}>{totalOppAct ?? '–'}</td>}
+            {showActual && <td className={totalOppAct !== null ? `pts-${scoreClass(totalOppAct)}${anyLive ? ' pts-live' : ''}` : ''}>{totalOppAct ?? '–'}</td>}
           </tr>
         </tfoot>
       </table>
