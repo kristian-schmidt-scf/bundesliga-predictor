@@ -14,12 +14,14 @@ The app pulls three seasons of historical results on startup, fits a Dixon-Coles
 ## Features
 
 - **Match predictions** — 9×9 score probability heatmap, win/draw/loss probabilities, expected goals, most likely scoreline
-- **Bookmaker edge** — live EU odds fetched at request time, normalised implied probabilities, edge per outcome highlighted
-- **Tipp 11 assistant** — optimal tip per fixture based on expected Tipp 11 points; round summary showing actual vs expected
+- **Bookmaker edge** — implied probabilities averaged across all available bookmakers, edge per outcome highlighted
+- **Tipp 11 assistant** — optimal tip per fixture based on expected Tipp 11 points; round summary showing actual vs expected; pick tracker recording your selections
 - **Model blend** — toggle a 50/50 Dixon-Coles + bookmaker blend affecting all outputs
-- **League table** — live standings with model-implied projected points for remaining fixtures
+- **League table** — live standings with Monte Carlo-simulated projected final standings and team profile overlays
+- **CLV tracking** — closing line value per fixture: compares frozen model probabilities against the market's final price before kickoff
 - **Calibration** — Brier score, log-loss, per-matchday chart, and an ablation table comparing 8 model variants
 - **Back-testing** — walk-forward backtest over Spieltage 18–30: tendency accuracy, Brier, log-loss, Tipp 11 expected vs actual
+- **Live auto-refresh** — predictions poll every 20 seconds while at least one match is in play
 
 ---
 
@@ -33,6 +35,8 @@ On top of the base model, four adjustments are applied at prediction time:
 - **H2H shrinkage** — Bayesian nudge of expected goals toward historical head-to-head averages (k=5 shrinkage)
 - **Form scaling** — multiplies expected goals by a form factor derived from each team's points-per-game over their last 5 matches
 - **Fatigue / travel** — rest-day penalty (optimal at 7 days, penalised below 4 or above 14) and a haversine travel distance penalty on the away side
+
+A second model variant — **Bayes Prior** — re-fits the same Dixon-Coles model but uses market-implied expected goals as priors, blending the model's own estimates toward what bookmakers imply. Both variants are available throughout the UI via the model toggle in the navigation bar.
 
 The calibration ablation table measures whether each of these adjustments actually improves predictive accuracy, making it easy to see which ones earn their place.
 
@@ -92,12 +96,15 @@ Open `http://localhost:5173`. The Vite dev server proxies all `/api` calls to th
 | Endpoint | Description |
 |----------|-------------|
 | `GET /api/health` | Model status and team count |
-| `GET /api/predictions/upcoming` | Predictions for upcoming fixtures (`?model_variant=bayes` for the bookmaker-prior variant) |
+| `GET /api/predictions/upcoming` | Predictions for upcoming fixtures (`?model_variant=base\|bayes`) |
 | `GET /api/predictions/match` | Ad-hoc prediction (`?home_team=X&away_team=Y`) |
 | `GET /api/fixtures/upcoming` | Raw fixture list |
-| `GET /api/table` | League table + model-projected standings |
+| `GET /api/table` | League table + Monte Carlo projected standings |
 | `GET /api/calibration` | Brier score, log-loss, per-matchday breakdown, ablation variants |
 | `GET /api/backtest` | Walk-forward backtest results (computed lazily on first request) |
+| `GET /api/clv` | Closing line value for all settled fixtures (`?model_variant=base\|bayes`) |
+| `GET /api/model_params` | Per-team attack / defence / home-advantage parameters |
+| `GET /api/teams/{name}` | Team profile: form, H2H record, season stats |
 
 ---
 
