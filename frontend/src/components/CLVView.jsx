@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import axios from 'axios'
 import './CLVView.css'
 
@@ -9,9 +9,9 @@ function pct(v) {
 }
 
 function clvClass(v) {
-  if (v == null) return 'clv-none'
-  if (v > 0.01)  return 'clv-pos'
-  if (v < -0.01) return 'clv-neg'
+  if (v == null)   return 'clv-none'
+  if (v > 0.005)   return 'clv-pos'
+  if (v < -0.005)  return 'clv-neg'
   return 'clv-flat'
 }
 
@@ -30,11 +30,52 @@ function SummaryCard({ label, value, sub, highlight }) {
   )
 }
 
+function Sparkline({ matchdays, effectiveMd, onSelect }) {
+  const maxAbs = Math.max(0.03, ...matchdays.map(m => Math.abs(m.avgClv ?? 0)))
+
+  return (
+    <div className="clv-spark-wrap">
+      <div className="clv-spark-bars">
+        <button
+          className={`clv-spark-all-btn${effectiveMd == null ? ' active' : ''}`}
+          onClick={() => onSelect(null)}
+        >
+          All
+        </button>
+        {matchdays.map(m => {
+          const isActive = effectiveMd === m.matchday
+          const pct = m.avgClv != null ? Math.min(100, Math.abs(m.avgClv) / maxAbs * 100) : 3
+          const fillClass = m.avgClv == null ? 'none'
+            : m.avgClv > 0.005  ? 'pos'
+            : m.avgClv < -0.005 ? 'neg'
+            : 'flat'
+          return (
+            <button
+              key={m.matchday}
+              className={`clv-spark-btn${isActive ? ' active' : ''}`}
+              onClick={() => onSelect(m.matchday)}
+              title={`MD${m.matchday}: ${m.avgClv != null ? clvFmt(m.avgClv) : 'no closing odds'} · ${m.withClv}/${m.total} fixtures`}
+            >
+              <div className="clv-spark-track">
+                <div className={`clv-spark-fill ${fillClass}`} style={{ height: `${pct}%` }} />
+              </div>
+              <span className="clv-spark-md">{m.matchday}</span>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 export default function CLVView({ modelVariant = 'base' }) {
   const [fetchState, setFetchState] = useState({ variant: null, data: null, error: null })
   const loading = fetchState.variant !== modelVariant
   const data  = fetchState.data
   const error = fetchState.error
+
+  // '__latest__' = default to most recent MD; null = show all; number = specific MD
+  const [selectedMd, setSelectedMd] = useState('__latest__')
 
   useEffect(() => {
     axios.get(`/api/clv?model_variant=${modelVariant}`)
@@ -42,12 +83,54 @@ export default function CLVView({ modelVariant = 'base' }) {
       .catch(e => setFetchState({ variant: modelVariant, data: null, error: e.message }))
   }, [modelVariant])
 
+  const entries = useMemo(() => data?.entries ?? [], [data])
+
+  // Per-matchday aggregates (for sparkline)
+  const matchdays = useMemo(() => {
+    const map = {}
+    for (const e of entries) {
+      if (!map[e.matchday]) map[e.matchday] = { matchday: e.matchday, all: [], withClv: [] }
+      map[e.matchday].all.push(e)
+      if (e.best_clv != null) map[e.matchday].withClv.push(e)
+    }
+    return Object.values(map)
+      .sort((a, b) => a.matchday - b.matchday)
+      .map(({ matchday, all, withClv }) => ({
+        matchday,
+        total: all.length,
+        withClv: withClv.length,
+        avgClv: withClv.length > 0
+          ? withClv.reduce((s, e) => s + e.best_clv, 0) / withClv.length
+          : null,
+      }))
+  }, [entries])
+
+  const latestMd = matchdays.length > 0 ? matchdays[matchdays.length - 1].matchday : null
+  const effectiveMd = selectedMd === '__latest__' ? latestMd : selectedMd
+
+  const filteredEntries = useMemo(
+    () => effectiveMd == null ? entries : entries.filter(e => e.matchday === effectiveMd),
+    [entries, effectiveMd]
+  )
+
+  const filteredStats = useMemo(() => {
+    const withClv = filteredEntries.filter(e => e.best_clv != null)
+    return {
+      avgBestClv: withClv.length > 0
+        ? withClv.reduce((s, e) => s + e.best_clv, 0) / withClv.length
+        : null,
+      fixturesWithClosing: withClv.length,
+      fixturesTotal: filteredEntries.length,
+    }
+  }, [filteredEntries])
+
   if (loading) return <div className="status">Loading CLV data…</div>
   if (error)   return <div className="status error">Error: {error}</div>
   if (!data)   return null
 
-  const { entries, avg_best_clv, fixtures_with_closing, fixtures_total } = data
-  const noOdds = fixtures_with_closing === 0
+  const { avgBestClv, fixturesWithClosing, fixturesTotal } = filteredStats
+  const noOdds = fixturesWithClosing === 0
+  const scopeLabel = effectiveMd != null ? `MD${effectiveMd}` : 'all matchdays'
 
   return (
     <div className="clv-wrapper">
@@ -64,21 +147,29 @@ export default function CLVView({ modelVariant = 'base' }) {
       <div className="clv-cards">
         <SummaryCard
           label="Avg CLV (best pick)"
-          value={avg_best_clv != null ? clvFmt(avg_best_clv) : '–'}
-          sub={`${fixtures_with_closing} fixture${fixtures_with_closing !== 1 ? 's' : ''} with closing odds`}
-          highlight={avg_best_clv != null && avg_best_clv > 0}
+          value={avgBestClv != null ? clvFmt(avgBestClv) : '–'}
+          sub={`${fixturesWithClosing} fixture${fixturesWithClosing !== 1 ? 's' : ''} with closing odds · ${scopeLabel}`}
+          highlight={avgBestClv != null && avgBestClv > 0}
         />
         <SummaryCard
-          label="Fixtures in cache"
-          value={fixtures_total}
-          sub="settled fixtures with frozen predictions"
+          label="Fixtures"
+          value={fixturesTotal}
+          sub={`settled · ${scopeLabel}`}
         />
         <SummaryCard
           label="Coverage"
-          value={fixtures_total > 0 ? `${Math.round(fixtures_with_closing / fixtures_total * 100)}%` : '–'}
+          value={fixturesTotal > 0 ? `${Math.round(fixturesWithClosing / fixturesTotal * 100)}%` : '–'}
           sub="have closing odds"
         />
       </div>
+
+      {matchdays.length > 1 && (
+        <Sparkline
+          matchdays={matchdays}
+          effectiveMd={effectiveMd}
+          onSelect={md => setSelectedMd(md)}
+        />
+      )}
 
       {noOdds && (
         <div className="clv-notice">
@@ -87,14 +178,14 @@ export default function CLVView({ modelVariant = 'base' }) {
         </div>
       )}
 
-      {entries.length === 0 ? (
+      {filteredEntries.length === 0 ? (
         <div className="status">No settled fixtures in prediction cache yet.</div>
       ) : (
         <div className="clv-table-wrap">
           <table className="clv-table">
             <thead>
               <tr>
-                <th>MD</th>
+                {effectiveMd == null && <th>MD</th>}
                 <th className="clv-fix-hdr">Fixture</th>
                 <th>Result</th>
                 <th className="clv-group-hdr" colSpan={3}>Model %</th>
@@ -103,7 +194,8 @@ export default function CLVView({ modelVariant = 'base' }) {
                 <th>Best pick</th>
               </tr>
               <tr className="clv-sub-hdr">
-                <th /><th /><th />
+                {effectiveMd == null && <th />}
+                <th /><th />
                 <th>H</th><th>D</th><th>A</th>
                 <th>H</th><th>D</th><th>A</th>
                 <th>H</th><th>D</th><th>A</th>
@@ -111,11 +203,11 @@ export default function CLVView({ modelVariant = 'base' }) {
               </tr>
             </thead>
             <tbody>
-              {entries.map(e => (
+              {filteredEntries.map(e => (
                 <tr key={e.fixture_id} className={e.home_score != null ? 'settled' : ''}>
-                  <td className="clv-md">{e.matchday}</td>
+                  {effectiveMd == null && <td className="clv-md">{e.matchday}</td>}
                   <td className="clv-fixture">
-                    {e.home_team.split(' ').pop()} – {e.away_team.split(' ').pop()}
+                    {e.home_short_name || e.home_team} – {e.away_short_name || e.away_team}
                   </td>
                   <td className="clv-result">
                     {e.home_score != null ? `${e.home_score}–${e.away_score}` : '–'}

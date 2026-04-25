@@ -253,6 +253,8 @@ class CLVEntry(BaseModel):
     matchday: int
     home_team: str
     away_team: str
+    home_short_name: str = ""
+    away_short_name: str = ""
     utc_date: str
     home_score: Optional[int] = None
     away_score: Optional[int] = None
