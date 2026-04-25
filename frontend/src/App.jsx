@@ -210,7 +210,7 @@ export default function App() {
           setLastUpdated(new Date())
         })
         .catch(() => {})
-    }, 60_000)
+    }, 20_000)
     return () => clearInterval(id)
   }, [liveCount, modelVariant])
 
