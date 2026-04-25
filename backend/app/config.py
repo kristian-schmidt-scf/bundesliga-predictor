@@ -44,5 +44,8 @@ class Settings(BaseSettings):
     # User Tipp 11 picks persistence
     picks_db_path: str = "user_picks.db"  # relative to the backend/ directory
 
+    # Frozen pre-kickoff prediction cache
+    prediction_cache_db_path: str = "prediction_cache.db"  # relative to the backend/ directory
+
 
 settings = Settings()

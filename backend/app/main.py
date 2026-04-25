@@ -11,7 +11,7 @@ import logging
 
 from app.routers import fixtures, predictions, table, calibration, model_params, backtest as backtest_router, simulation as simulation_router, teams as teams_router, h2h as h2h_router, odds as odds_router, picks as picks_router, clv as clv_router
 from app.services import backtest as backtest_service
-from app.services import odds_history, user_picks
+from app.services import odds_history, user_picks, prediction_cache_db
 from app.services.dixon_coles import get_model, get_model_bayes
 from app.services.football_data import (
     get_historical_results, get_current_season_results, get_current_and_upcoming_fixtures
@@ -167,6 +167,7 @@ async def lifespan(app: FastAPI):
     from pathlib import Path
     odds_history.init(Path(__file__).parent.parent / settings.odds_db_path)
     user_picks.init(Path(__file__).parent.parent / settings.picks_db_path)
+    prediction_cache_db.init(Path(__file__).parent.parent / settings.prediction_cache_db_path)
 
     logger.info("=== Startup: fitting Dixon-Coles models ===")
     try:

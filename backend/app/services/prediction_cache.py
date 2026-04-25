@@ -1,15 +1,5 @@
-from app.models.schemas import Prediction
+from app.services.prediction_cache_db import base as _cache
 
-_cache: dict[int, Prediction] = {}
-
-
-def get(fixture_id: int) -> Prediction | None:
-    return _cache.get(fixture_id)
-
-
-def set(fixture_id: int, prediction: Prediction) -> None:
-    _cache[fixture_id] = prediction
-
-
-def get_all() -> dict[int, Prediction]:
-    return dict(_cache)
+get     = _cache.get
+set     = _cache.set
+get_all = _cache.get_all
