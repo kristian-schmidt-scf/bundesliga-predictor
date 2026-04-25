@@ -36,6 +36,10 @@ _fixtures_cache: list[Fixture] | None = None
 _fixtures_cache_ts: float = 0.0
 _FIXTURES_TTL = 60.0  # seconds
 
+_standings_cache: list[dict] | None = None
+_standings_cache_ts: float = 0.0
+_STANDINGS_TTL = 300.0  # 5 minutes — standings change only after matches finish
+
 
 async def get_upcoming_fixtures(matchdays_ahead: int = 5) -> list[Fixture]:
     """Fetch upcoming scheduled Bundesliga fixtures."""
@@ -150,16 +154,18 @@ async def get_current_season_results() -> list[dict]:
 
 
 async def get_standings() -> list[dict]:
-    """Fetch current Bundesliga standings."""
+    """Fetch current Bundesliga standings. Cached for 5 minutes."""
+    global _standings_cache, _standings_cache_ts
+    if _standings_cache is not None and (time.monotonic() - _standings_cache_ts) < _STANDINGS_TTL:
+        return _standings_cache
+
     url = f"{settings.football_data_base_url}/competitions/{settings.bundesliga_competition_code}/standings"
 
     async with httpx.AsyncClient() as client:
-        resp = await client.get(url, headers=HEADERS, timeout=10)
-        resp.raise_for_status()
+        data = await _get_json(client, url, headers=HEADERS, timeout=10)
 
-    data = resp.json()
     table = data["standings"][0]["table"]  # [0] = overall standings
-    return [
+    result = [
         {
             "position": row["position"],
             "team_id": row["team"]["id"],
@@ -178,6 +184,9 @@ async def get_standings() -> list[dict]:
         }
         for row in table
     ]
+    _standings_cache = result
+    _standings_cache_ts = time.monotonic()
+    return result
 
 
 def _parse_fixture(match: dict) -> Fixture:
