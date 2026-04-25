@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import asyncio
 import logging
 
-from app.routers import fixtures, predictions, table, calibration, model_params, backtest as backtest_router, simulation as simulation_router, teams as teams_router, h2h as h2h_router, odds as odds_router, picks as picks_router
+from app.routers import fixtures, predictions, table, calibration, model_params, backtest as backtest_router, simulation as simulation_router, teams as teams_router, h2h as h2h_router, odds as odds_router, picks as picks_router, clv as clv_router
 from app.services import backtest as backtest_service
 from app.services import odds_history, user_picks
 from app.services.dixon_coles import get_model, get_model_bayes
@@ -89,10 +89,6 @@ async def _snapshot_current_odds(fixtures, odds_map) -> None:
             odds_history.record_snapshot(fixture.id, match_odds)
             count += 1
     logger.info("Odds snapshots recorded for %d fixtures", count)
-
-    settled = {f.id for f in fixtures if f.status in ("FINISHED", "AWARDED")}
-    if settled:
-        odds_history.prune(settled)
 
 
 async def _poll_odds_and_snapshot() -> None:
@@ -210,6 +206,7 @@ app.include_router(teams_router.router, prefix="/api")
 app.include_router(h2h_router.router, prefix="/api")
 app.include_router(odds_router.router, prefix="/api")
 app.include_router(picks_router.router, prefix="/api")
+app.include_router(clv_router.router, prefix="/api")
 
 
 @app.get("/api/health")

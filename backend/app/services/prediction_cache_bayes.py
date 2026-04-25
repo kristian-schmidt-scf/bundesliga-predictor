@@ -9,3 +9,7 @@ def get(fixture_id: int) -> Prediction | None:
 
 def set(fixture_id: int, prediction: Prediction) -> None:
     _cache[fixture_id] = prediction
+
+
+def get_all() -> dict[int, Prediction]:
+    return dict(_cache)

@@ -6,6 +6,7 @@ import AccuracySummary from './components/AccuracySummary'
 import Tipp11Summary from './components/Tipp11Summary'
 import CalibrationView from './components/CalibrationView'
 import BacktestView from './components/BacktestView'
+import CLVView from './components/CLVView'
 import TeamProfile from './components/TeamProfile'
 import { blendScoreMatrix } from './utils/blendOdds'
 import { bestTipp11Tip } from './utils/tipp11'
@@ -137,6 +138,7 @@ export default function App() {
   const [showTable, setShowTable] = useState(false)
   const [showCalibration, setShowCalibration] = useState(false)
   const [showBacktest, setShowBacktest] = useState(false)
+  const [showCLV, setShowCLV] = useState(false)
   const [modelVariant, setModelVariant] = useState('base')
   const [bayesPredictions, setBayesPredictions] = useState([])
   const [profileTeam, setProfileTeam] = useState(null)
@@ -233,8 +235,8 @@ export default function App() {
       <AppHeader />
       {profileTeam && <TeamProfile teamName={profileTeam} onClose={() => setProfileTeam(null)} />}
 
-      <div className={`app-body${showTable || showCalibration || showBacktest ? ' no-sidebar' : ''}`}>
-        {visiblePredictions.length > 0 && !showTable && !showCalibration && !showBacktest && (
+      <div className={`app-body${showTable || showCalibration || showBacktest || showCLV ? ' no-sidebar' : ''}`}>
+        {visiblePredictions.length > 0 && !showTable && !showCalibration && !showBacktest && !showCLV && (
           <MatchupSidebar predictions={visiblePredictions} onSelect={scrollToFixture} blendOdds={blendOdds} />
         )}
 
@@ -314,6 +316,14 @@ export default function App() {
                 Backtest
               </button>
 
+              <button
+                className={`filter-btn${showCLV ? ' view-active' : ''}`}
+                onClick={() => setShowCLV(v => !v)}
+                title="Closing Line Value — model vs. market's final price"
+              >
+                CLV
+              </button>
+
               <div className="filter-separator" />
 
               {/* Group 4: model selector */}
@@ -352,8 +362,8 @@ export default function App() {
             </div>
           )}
 
-          {!showTable && !showCalibration && !showBacktest && <AccuracySummary predictions={visiblePredictions} />}
-          {!showTable && !showCalibration && !showBacktest && showTipp11 && (
+          {!showTable && !showCalibration && !showBacktest && !showCLV && <AccuracySummary predictions={visiblePredictions} />}
+          {!showTable && !showCalibration && !showBacktest && !showCLV && showTipp11 && (
             <Tipp11Summary
               predictions={visiblePredictions}
               bayesPredictions={bayesPredictions}
@@ -361,7 +371,9 @@ export default function App() {
             />
           )}
 
-          {showBacktest ? (
+          {showCLV ? (
+            <CLVView modelVariant={modelVariant} />
+          ) : showBacktest ? (
             <BacktestView />
           ) : showCalibration ? (
             <CalibrationView />
