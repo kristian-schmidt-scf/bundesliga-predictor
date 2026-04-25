@@ -226,6 +226,7 @@
 /* Live dot */
 .live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted); flex-shrink: 0; }
 .live-dot.pulsing { background: var(--green); animation: pulse 1.4s ease-in-out infinite; }
+.live-updated { font-size: var(--text-xxs); color: var(--green); opacity: 0.7; white-space: nowrap; }
 
 @keyframes pulse {
   0%, 100% { opacity: 1; transform: scale(1); }

@@ -126,8 +126,8 @@ function MatchupSidebar({ predictions, onSelect, blendOdds }) {
 }
 
 export default function App() {
-  const [allPredictions, setAllPredictions] = useState([])
-  const [groups, setGroups] = useState([])
+  // variant tracks which model the current predictions came from; loading derived from mismatch
+  const [fetchState, setFetchState] = useState({ variant: null, predictions: [], error: null })
   const [selectedMatchday, setSelectedMatchday] = useState(null)
   const [liveOnly, setLiveOnly] = useState(false)
   const [selectedTeam, setSelectedTeam] = useState('')
@@ -139,22 +139,14 @@ export default function App() {
   const [showBacktest, setShowBacktest] = useState(false)
   const [modelVariant, setModelVariant] = useState('base')
   const [bayesPredictions, setBayesPredictions] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
   const [profileTeam, setProfileTeam] = useState(null)
+  const [lastUpdated, setLastUpdated] = useState(null)
 
-  useEffect(() => {
-    axios.get(`/api/predictions/upcoming?model_variant=${modelVariant}`)
-      .then(res => {
-        const preds = res.data
-        const g = groupByMatchday(preds)
-        setAllPredictions(preds)
-        setGroups(g)
-        setSelectedMatchday(defaultMatchday(g))
-      })
-      .catch(err => setError(err.message))
-      .finally(() => setLoading(false))
-  }, [])
+  const allPredictions = fetchState.predictions
+  const loading = fetchState.variant !== modelVariant
+  const error = fetchState.error
+
+  const groups = useMemo(() => groupByMatchday(allPredictions), [allPredictions])
 
   const teams = useMemo(() => {
     const s = new Set()
@@ -171,6 +163,7 @@ export default function App() {
   )
 
   const visiblePredictions = useMemo(() => {
+    if (loading) return []
     let preds = allPredictions
 
     if (liveOnly) {
@@ -187,23 +180,16 @@ export default function App() {
     }
 
     return preds
-  }, [allPredictions, groups, selectedMatchday, liveOnly, selectedTeam])
+  }, [loading, allPredictions, groups, selectedMatchday, liveOnly, selectedTeam])
 
   useEffect(() => {
-    setAllPredictions([])
-    setGroups([])
-    setSelectedMatchday(null)
-    setLoading(true)
     axios.get(`/api/predictions/upcoming?model_variant=${modelVariant}`)
       .then(res => {
         const preds = res.data
-        const g = groupByMatchday(preds)
-        setAllPredictions(preds)
-        setGroups(g)
-        setSelectedMatchday(defaultMatchday(g))
+        setFetchState({ variant: modelVariant, predictions: preds, error: null })
+        setSelectedMatchday(defaultMatchday(groupByMatchday(preds)))
       })
-      .catch(err => setError(err.message))
-      .finally(() => setLoading(false))
+      .catch(err => setFetchState({ variant: modelVariant, predictions: [], error: err.message }))
   }, [modelVariant])
 
   // Fetch Bayes predictions for side-by-side Tipp 11 comparison
@@ -213,6 +199,20 @@ export default function App() {
       .then(res => setBayesPredictions(res.data))
       .catch(() => setBayesPredictions([]))
   }, [showTipp11])
+
+  // Auto-refresh every 60s while at least one game is live
+  useEffect(() => {
+    if (liveCount === 0) return
+    const id = setInterval(() => {
+      axios.get(`/api/predictions/upcoming?model_variant=${modelVariant}`)
+        .then(res => {
+          setFetchState(prev => ({ ...prev, predictions: res.data }))
+          setLastUpdated(new Date())
+        })
+        .catch(() => {})
+    }, 60_000)
+    return () => clearInterval(id)
+  }, [liveCount, modelVariant])
 
   function toggleFavorite() {
     if (favoriteTeam === selectedTeam) {
@@ -266,6 +266,11 @@ export default function App() {
                 <span className={`live-dot${liveCount > 0 ? ' pulsing' : ''}`} />
                 Live{liveCount > 0 ? ` (${liveCount})` : ''}
               </button>
+              {liveCount > 0 && lastUpdated && (
+                <span className="live-updated">
+                  ↻ {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
 
               <div className="filter-separator" />
 
