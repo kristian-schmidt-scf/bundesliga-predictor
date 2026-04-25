@@ -204,8 +204,9 @@ export default function App() {
       .catch(() => setBayesPredictions([]))
   }, [showTipp11])
 
+  // Always poll: 60s when idle (catches kickoff), 20s while live.
+  // Without this, liveCount never becomes >0 because no request ever fires after the initial load.
   useEffect(() => {
-    if (liveCount === 0) return
     const id = setInterval(() => {
       axios.get(`/api/predictions/upcoming?model_variant=${modelVariant}`)
         .then(res => {
@@ -213,7 +214,7 @@ export default function App() {
           setLastUpdated(new Date())
         })
         .catch(() => {})
-    }, 20_000)
+    }, liveCount > 0 ? 20_000 : 60_000)
     return () => clearInterval(id)
   }, [liveCount, modelVariant])
 
