@@ -46,41 +46,48 @@ async def get_bundesliga_odds() -> dict[str, MatchOdds]:
         if not bookmakers:
             continue
 
-        # Use the first available bookmaker (you could average across all)
-        bookie = bookmakers[0]
-        bookie_name = bookie.get("title", "unknown")
-        markets = bookie.get("markets", [])
+        # Collect raw implied probs from every bookmaker that has h2h markets
+        raw_homes, raw_draws, raw_aways = [], [], []
+        rep_home_odds = rep_draw_odds = rep_away_odds = None  # from first valid book
 
-        h2h_outcomes = None
-        for market in markets:
-            if market["key"] == "h2h":
-                h2h_outcomes = {o["name"]: o["price"] for o in market["outcomes"]}
-                break
+        for bookie in bookmakers:
+            h2h_outcomes = None
+            for market in bookie.get("markets", []):
+                if market["key"] == "h2h":
+                    h2h_outcomes = {o["name"]: o["price"] for o in market["outcomes"]}
+                    break
+            if not h2h_outcomes:
+                continue
 
-        if not h2h_outcomes:
+            h = h2h_outcomes.get(home_team)
+            d = h2h_outcomes.get("Draw")
+            a = h2h_outcomes.get(away_team)
+            if not all([h, d, a]):
+                continue
+
+            raw_homes.append(1 / h)
+            raw_draws.append(1 / d)
+            raw_aways.append(1 / a)
+            if rep_home_odds is None:
+                rep_home_odds, rep_draw_odds, rep_away_odds = h, d, a
+
+        if not raw_homes:
             continue
 
-        home_odds = h2h_outcomes.get(home_team)
-        away_odds = h2h_outcomes.get(away_team)
-        draw_odds = h2h_outcomes.get("Draw")
-
-        if not all([home_odds, away_odds, draw_odds]):
-            continue
-
-        # Implied probabilities (raw, will sum to > 1 due to bookmaker margin)
-        raw_home = 1 / home_odds
-        raw_draw = 1 / draw_odds
-        raw_away = 1 / away_odds
-        total = raw_home + raw_draw + raw_away
+        n_books = len(raw_homes)
+        avg_home = sum(raw_homes) / n_books
+        avg_draw = sum(raw_draws) / n_books
+        avg_away = sum(raw_aways) / n_books
+        total = avg_home + avg_draw + avg_away
 
         match_odds = MatchOdds(
-            home_win=home_odds,
-            draw=draw_odds,
-            away_win=away_odds,
-            implied_home_prob=round(raw_home / total, 4),
-            implied_draw_prob=round(raw_draw / total, 4),
-            implied_away_prob=round(raw_away / total, 4),
-            bookmaker=bookie_name,
+            home_win=rep_home_odds,
+            draw=rep_draw_odds,
+            away_win=rep_away_odds,
+            implied_home_prob=round(avg_home / total, 4),
+            implied_draw_prob=round(avg_draw / total, 4),
+            implied_away_prob=round(avg_away / total, 4),
+            bookmaker=f"avg ({n_books} books)" if n_books > 1 else bookmakers[0].get("title", "unknown"),
         )
 
         # Store under both orderings to make matching easier
