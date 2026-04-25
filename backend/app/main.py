@@ -126,6 +126,36 @@ async def _odds_poll_loop() -> None:
         await _poll_odds_and_snapshot()
 
 
+async def _pre_kickoff_snapshot_loop() -> None:
+    """
+    Capture the true closing line by snapshotting odds once per fixture in the
+    90-minute window before kickoff.  Costs one Odds API call per batch of
+    simultaneous kickoffs regardless of how many games start at once.
+    """
+    snapshotted: set[int] = set()
+    while True:
+        await asyncio.sleep(300)  # check every 5 minutes
+        try:
+            now = datetime.now(timezone.utc)
+            fixtures = await get_current_and_upcoming_fixtures()
+            due = [
+                f for f in fixtures
+                if f.id not in snapshotted
+                and f.status == "SCHEDULED"
+                and 5 <= (f.utc_date - now).total_seconds() / 60 <= 90
+            ]
+            if due:
+                logger.info(
+                    "Pre-kickoff snapshot: %d fixture(s) kick off within 90 min", len(due)
+                )
+                odds_map = await get_bundesliga_odds()
+                await _snapshot_current_odds(fixtures, odds_map)
+                for f in due:
+                    snapshotted.add(f.id)
+        except Exception as e:
+            logger.warning("Pre-kickoff snapshot failed: %s", e)
+
+
 def _start_background(coro) -> None:
     task = asyncio.create_task(coro)
     _bg_tasks.add(task)
@@ -176,6 +206,7 @@ async def lifespan(app: FastAPI):
 
     _start_background(_daily_refit_loop())
     _start_background(_odds_poll_loop())
+    _start_background(_pre_kickoff_snapshot_loop())
 
     yield  # server runs here
 
