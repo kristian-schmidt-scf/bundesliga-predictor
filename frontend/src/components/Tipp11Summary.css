@@ -75,6 +75,9 @@
 /* Your pick column */
 .t11s-my-pick-hdr { color: var(--yellow); }
 
+/* Opponent pick column */
+.t11s-opp-pick-hdr { color: var(--red); }
+
 .t11s-my-pick-cell { white-space: nowrap; }
 
 .pick-input-group {
@@ -102,6 +105,10 @@
 .pick-input:focus {
   outline: none;
   border-color: var(--yellow);
+}
+
+.pick-input--opp:focus {
+  border-color: var(--red);
 }
 
 .pick-sep {
