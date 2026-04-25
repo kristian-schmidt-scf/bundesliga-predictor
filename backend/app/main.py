@@ -51,7 +51,7 @@ async def _run_full_refit() -> list[dict]:
 
     try:
         upcoming_fixtures = await get_current_and_upcoming_fixtures()
-        odds_map = await get_bundesliga_odds()
+        odds_map = await get_bundesliga_odds(force_refresh=True)
         odds_list = _build_odds_list(upcoming_fixtures, odds_map)
         get_model_bayes().fit_with_prior(all_results, odds_list)
         logger.info("Bayesian prior model refit complete")
@@ -95,7 +95,7 @@ async def _poll_odds_and_snapshot() -> None:
     """Fetch fresh odds and record snapshots (called by the background poll loop)."""
     try:
         fixtures = await get_current_and_upcoming_fixtures()
-        odds_map = await get_bundesliga_odds()
+        odds_map = await get_bundesliga_odds(force_refresh=True)
         await _snapshot_current_odds(fixtures, odds_map)
     except Exception as e:
         logger.warning("Odds snapshot poll failed: %s", e)
@@ -148,7 +148,7 @@ async def _pre_kickoff_snapshot_loop() -> None:
                 logger.info(
                     "Pre-kickoff snapshot: %d fixture(s) kick off within 90 min", len(due)
                 )
-                odds_map = await get_bundesliga_odds()
+                odds_map = await get_bundesliga_odds(force_refresh=True)
                 await _snapshot_current_odds(fixtures, odds_map)
                 for f in due:
                     snapshotted.add(f.id)

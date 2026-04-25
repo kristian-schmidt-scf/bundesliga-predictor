@@ -35,8 +35,8 @@ class Settings(BaseSettings):
     # Scheduled tasks
     # Hour of day (local time, 0-23) to run the daily model refit
     refit_hour: int = 6
-    # Interval between odds snapshot polls in seconds (default 2h; free tier has 500 req/month)
-    odds_poll_interval_seconds: int = 7200
+    # Interval between odds snapshot polls in seconds (default 12h; free tier has 500 req/month)
+    odds_poll_interval_seconds: int = 43200
 
     # Odds history persistence
     odds_db_path: str = "odds_history.db"  # relative to the backend/ directory

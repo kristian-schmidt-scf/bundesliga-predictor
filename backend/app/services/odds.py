@@ -12,13 +12,25 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Module-level cache — background tasks own the refresh cycle via force_refresh=True.
+# The predictions endpoint always reads from here, costing zero API calls.
+_odds_cache: dict[str, MatchOdds] | None = None
 
-async def get_bundesliga_odds() -> dict[str, MatchOdds]:
+
+async def get_bundesliga_odds(force_refresh: bool = False) -> dict[str, MatchOdds]:
     """
     Fetch current h2h odds for all upcoming Bundesliga matches.
     Returns a dict keyed by a normalised match key: "home_team vs away_team"
     so we can join against fixtures from football-data.org.
+
+    Pass force_refresh=True only from background tasks (startup, daily refit,
+    scheduled poll, pre-kickoff snapshot).  All other callers get the cached
+    result so the 500 req/month free-tier budget is not exhausted.
     """
+    global _odds_cache
+    if not force_refresh and _odds_cache is not None:
+        return _odds_cache
+
     url = f"{settings.odds_api_base_url}/sports/{settings.odds_sport_key}/odds"
     params = {
         "apiKey": settings.odds_api_key,
@@ -33,7 +45,7 @@ async def get_bundesliga_odds() -> dict[str, MatchOdds]:
             resp.raise_for_status()
     except Exception as e:
         logger.warning(f"Odds API unavailable ({type(e).__name__}) — serving predictions without odds")
-        return {}
+        return _odds_cache if _odds_cache is not None else {}
 
     data = resp.json()
     odds_map: dict[str, MatchOdds] = {}
@@ -95,6 +107,7 @@ async def get_bundesliga_odds() -> dict[str, MatchOdds]:
         odds_map[key] = match_odds
 
     logger.info(f"Fetched odds for {len(odds_map)} Bundesliga matches")
+    _odds_cache = odds_map
     return odds_map
 
 
