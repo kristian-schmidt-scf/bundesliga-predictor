@@ -245,6 +245,46 @@ class UserPickRequest(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Closing line value (CLV)
+# ---------------------------------------------------------------------------
+
+class CLVEntry(BaseModel):
+    fixture_id: int
+    matchday: int
+    home_team: str
+    away_team: str
+    utc_date: str
+    home_score: Optional[int] = None
+    away_score: Optional[int] = None
+
+    model_home_prob: float
+    model_draw_prob: float
+    model_away_prob: float
+
+    opening_home_prob: Optional[float] = None
+    opening_draw_prob: Optional[float] = None
+    opening_away_prob: Optional[float] = None
+
+    closing_home_prob: Optional[float] = None
+    closing_draw_prob: Optional[float] = None
+    closing_away_prob: Optional[float] = None
+
+    clv_home: Optional[float] = None
+    clv_draw: Optional[float] = None
+    clv_away: Optional[float] = None
+
+    best_outcome: str          # "home" | "draw" | "away"
+    best_clv: Optional[float] = None
+
+
+class CLVResponse(BaseModel):
+    entries: list[CLVEntry]
+    avg_best_clv: Optional[float] = None
+    fixtures_with_closing: int
+    fixtures_total: int
+
+
+# ---------------------------------------------------------------------------
 # Odds movement
 # ---------------------------------------------------------------------------
 

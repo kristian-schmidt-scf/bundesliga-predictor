@@ -101,6 +101,22 @@ def get_history(fixture_id: int) -> list[OddsSnapshot]:
     return _snapshots.get(fixture_id, [])
 
 
+def get_opening_snapshot(fixture_id: int) -> OddsSnapshot | None:
+    snaps = _snapshots.get(fixture_id, [])
+    return snaps[0] if snaps else None
+
+
+def get_closing_snapshot(fixture_id: int, kickoff_utc: str) -> OddsSnapshot | None:
+    """Last snapshot recorded strictly before kickoff."""
+    snaps = _snapshots.get(fixture_id, [])
+    before = [s for s in snaps if s.timestamp < kickoff_utc]
+    return before[-1] if before else None
+
+
+def get_all_fixture_ids() -> list[int]:
+    return list(_snapshots.keys())
+
+
 def prune(fixture_ids: set[int]) -> None:
     """Remove snapshot history for settled fixtures from memory and DB."""
     removed = 0
