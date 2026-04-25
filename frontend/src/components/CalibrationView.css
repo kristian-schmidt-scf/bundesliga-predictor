@@ -118,3 +118,13 @@
 .cal-delta      { font-size: var(--text-xxs); }
 .cal-delta.good { color: var(--green); }
 .cal-delta.bad  { color: var(--red); }
+
+@media (max-width: 768px) {
+  .cal-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .cal-table {
+    min-width: 480px;
+  }
+}

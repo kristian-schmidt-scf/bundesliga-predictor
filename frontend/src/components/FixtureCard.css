@@ -121,3 +121,12 @@
 
 /* Lower section */
 .card-lower { display: flex; gap: 1.25rem; flex-wrap: wrap; }
+
+@media (max-width: 480px) {
+  .fixture-card {
+    padding: 0.85rem 0.75rem;
+  }
+  .team {
+    font-size: var(--text-md);
+  }
+}

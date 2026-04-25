@@ -121,3 +121,13 @@
 .pip-W { background: var(--green); }
 .pip-D { background: var(--text-secondary); }
 .pip-L { background: var(--red); }
+
+@media (max-width: 768px) {
+  .league-table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .league-table {
+    min-width: 560px;
+  }
+}

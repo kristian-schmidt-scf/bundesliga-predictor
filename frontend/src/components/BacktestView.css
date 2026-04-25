@@ -81,3 +81,13 @@
 .bt-table td.bad  { color: var(--red); }
 .bt-table .col-purple { color: var(--purple); }
 .bt-table .col-green  { color: var(--green); }
+
+@media (max-width: 768px) {
+  .bt-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .bt-table {
+    min-width: 480px;
+  }
+}

@@ -138,3 +138,13 @@
 
 /* Provisional pts (game still live) */
 .pts-live { opacity: 0.55; font-style: italic; }
+
+@media (max-width: 768px) {
+  .t11s-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .t11s-table {
+    min-width: 520px;
+  }
+}
