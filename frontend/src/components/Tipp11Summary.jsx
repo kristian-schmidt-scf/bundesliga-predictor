@@ -11,7 +11,7 @@ function getBestTip(prediction, useBlend) {
   return bestTipp11Tip(grid)
 }
 
-function PickInput({ fixtureId, matchday, homeTeam, awayTeam, initialPick, onSave }) {
+function PickInput({ fixtureId, matchday, homeTeam, awayTeam, initialPick, onSave, variant }) {
   const [h, setH] = useState(initialPick?.picked_home ?? '')
   const [a, setA] = useState(initialPick?.picked_away ?? '')
   const saveTimer = useRef(null)
@@ -29,10 +29,12 @@ function PickInput({ fixtureId, matchday, homeTeam, awayTeam, initialPick, onSav
     }, 400)
   }
 
+  const cls = `pick-input${variant ? ` pick-input--${variant}` : ''}`
+
   return (
     <span className="pick-input-group">
       <input
-        className="pick-input"
+        className={cls}
         type="number" min="0" max="20"
         value={h}
         onChange={e => { setH(e.target.value); tryCommit(e.target.value, a) }}
@@ -40,7 +42,7 @@ function PickInput({ fixtureId, matchday, homeTeam, awayTeam, initialPick, onSav
       />
       <span className="pick-sep">:</span>
       <input
-        className="pick-input"
+        className={cls}
         type="number" min="0" max="20"
         value={a}
         onChange={e => { setA(e.target.value); tryCommit(h, e.target.value) }}
@@ -51,7 +53,8 @@ function PickInput({ fixtureId, matchday, homeTeam, awayTeam, initialPick, onSav
 }
 
 export default function Tipp11Summary({ predictions, bayesPredictions, useBlend }) {
-  const [picks, setPicks] = useState({}) // keyed by fixture_id
+  const [picks, setPicks] = useState({})           // keyed by fixture_id
+  const [oppPicks, setOppPicks] = useState({})     // keyed by fixture_id
 
   useEffect(() => {
     fetch('/api/picks')
@@ -62,11 +65,18 @@ export default function Tipp11Summary({ predictions, bayesPredictions, useBlend 
         setPicks(map)
       })
       .catch(() => {})
+    fetch('/api/picks/opponent')
+      .then(r => r.json())
+      .then(data => {
+        const map = {}
+        for (const p of data) map[p.fixture_id] = p
+        setOppPicks(map)
+      })
+      .catch(() => {})
   }, [])
 
   async function handleSave(fixtureId, matchday, homeTeam, awayTeam, pickedHome, pickedAway) {
     if (pickedHome === null) {
-      // delete
       await fetch(`/api/picks/${fixtureId}`, { method: 'DELETE' }).catch(() => {})
       setPicks(prev => { const next = { ...prev }; delete next[fixtureId]; return next })
     } else {
@@ -78,6 +88,23 @@ export default function Tipp11Summary({ predictions, bayesPredictions, useBlend 
       if (res?.ok) {
         const saved = await res.json()
         setPicks(prev => ({ ...prev, [fixtureId]: saved }))
+      }
+    }
+  }
+
+  async function handleOppSave(fixtureId, matchday, homeTeam, awayTeam, pickedHome, pickedAway) {
+    if (pickedHome === null) {
+      await fetch(`/api/picks/opponent/${fixtureId}`, { method: 'DELETE' }).catch(() => {})
+      setOppPicks(prev => { const next = { ...prev }; delete next[fixtureId]; return next })
+    } else {
+      const res = await fetch(`/api/picks/opponent/${fixtureId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ matchday, home_team: homeTeam, away_team: awayTeam, picked_home: pickedHome, picked_away: pickedAway }),
+      }).catch(() => null)
+      if (res?.ok) {
+        const saved = await res.json()
+        setOppPicks(prev => ({ ...prev, [fixtureId]: saved }))
       }
     }
   }
@@ -103,7 +130,10 @@ export default function Tipp11Summary({ predictions, bayesPredictions, useBlend 
     const pick    = picks[fixture.id] ?? null
     const myPts   = (isFinished && pick) ? computePoints(pick.picked_home, pick.picked_away, home_score, away_score) : null
 
-    return { fixture, home_team, away_team, matchday, base, bayes, basePts, bayesPts, isFinished, home_score, away_score, pick, myPts }
+    const oppPick = oppPicks[fixture.id] ?? null
+    const oppPts  = (isFinished && oppPick) ? computePoints(oppPick.picked_home, oppPick.picked_away, home_score, away_score) : null
+
+    return { fixture, home_team, away_team, matchday, base, bayes, basePts, bayesPts, isFinished, home_score, away_score, pick, myPts, oppPick, oppPts }
   })
 
   const totalBaseExp  = rows.reduce((s, r) => s + r.base.pts, 0)
@@ -113,6 +143,9 @@ export default function Tipp11Summary({ predictions, bayesPredictions, useBlend 
   const totalBayesAct = (finishedRows.length > 0 && hasBayes) ? finishedRows.reduce((s, r) => s + (r.bayesPts ?? 0), 0) : null
   const pickedFinished = finishedRows.filter(r => r.myPts !== null)
   const totalMyAct    = pickedFinished.length > 0 ? pickedFinished.reduce((s, r) => s + r.myPts, 0) : null
+
+  const oppPickedFinished = finishedRows.filter(r => r.oppPts !== null)
+  const totalOppAct       = oppPickedFinished.length > 0 ? oppPickedFinished.reduce((s, r) => s + r.oppPts, 0) : null
 
   const showActual = finishedRows.length > 0
   const showResult = showActual
@@ -136,6 +169,8 @@ export default function Tipp11Summary({ predictions, bayesPredictions, useBlend 
             {showActual && hasBayes && <th>Bayes pts</th>}
             <th className="t11s-my-pick-hdr">Your pick</th>
             {showActual && <th>Your pts</th>}
+            <th className="t11s-opp-pick-hdr">Opp pick</th>
+            {showActual && <th>Opp pts</th>}
           </tr>
         </thead>
         <tbody>
@@ -171,6 +206,23 @@ export default function Tipp11Summary({ predictions, bayesPredictions, useBlend 
                   {r.myPts !== null ? r.myPts : '–'}
                 </td>
               )}
+              <td className="t11s-my-pick-cell">
+                <PickInput
+                  key={r.oppPick?.saved_at ?? 'opp-empty'}
+                  fixtureId={r.fixture.id}
+                  matchday={r.matchday}
+                  homeTeam={r.home_team.name}
+                  awayTeam={r.away_team.name}
+                  initialPick={r.oppPick}
+                  onSave={handleOppSave}
+                  variant="opp"
+                />
+              </td>
+              {showActual && (
+                <td className={r.oppPts !== null ? `pts-${scoreClass(r.oppPts)}` : 't11s-dash'}>
+                  {r.oppPts !== null ? r.oppPts : '–'}
+                </td>
+              )}
             </tr>
           ))}
         </tbody>
@@ -185,6 +237,8 @@ export default function Tipp11Summary({ predictions, bayesPredictions, useBlend 
             {showActual && hasBayes && <td className={totalBayesAct !== null ? `pts-${scoreClass(totalBayesAct)}` : ''}>{totalBayesAct ?? '–'}</td>}
             <td />
             {showActual && <td className={totalMyAct !== null ? `pts-${scoreClass(totalMyAct)}` : ''}>{totalMyAct ?? '–'}</td>}
+            <td />
+            {showActual && <td className={totalOppAct !== null ? `pts-${scoreClass(totalOppAct)}` : ''}>{totalOppAct ?? '–'}</td>}
           </tr>
         </tfoot>
       </table>
