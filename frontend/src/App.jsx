@@ -61,6 +61,15 @@ function AppHeader() {
 }
 
 const LIVE_STATUSES = new Set(['IN_PLAY', 'PAUSED', 'LIVE'])
+const UPCOMING_STATUSES = new Set(['SCHEDULED', 'TIMED'])
+
+const NAV_TABS = [
+  { id: 'fixtures',    label: 'Fixtures'    },
+  { id: 'table',       label: 'Table'       },
+  { id: 'calibration', label: 'Calibration' },
+  { id: 'backtest',    label: 'Backtest'    },
+  { id: 'clv',         label: 'CLV'         },
+]
 
 function groupByMatchday(predictions) {
   const groups = {}
@@ -73,8 +82,6 @@ function groupByMatchday(predictions) {
     .sort(([a], [b]) => Number(a) - Number(b))
     .map(([matchday, fixtures]) => ({ matchday: Number(matchday), fixtures }))
 }
-
-const UPCOMING_STATUSES = new Set(['SCHEDULED', 'TIMED'])
 
 function defaultMatchday(groups) {
   const live = groups.find(g => g.fixtures.some(p => LIVE_STATUSES.has(p.fixture.status)))
@@ -127,7 +134,6 @@ function MatchupSidebar({ predictions, onSelect, blendOdds }) {
 }
 
 export default function App() {
-  // variant tracks which model the current predictions came from; loading derived from mismatch
   const [fetchState, setFetchState] = useState({ variant: null, predictions: [], error: null })
   const [selectedMatchday, setSelectedMatchday] = useState(null)
   const [liveOnly, setLiveOnly] = useState(false)
@@ -135,10 +141,7 @@ export default function App() {
   const [favoriteTeam, setFavoriteTeam] = useState(() => localStorage.getItem('favTeam') ?? '')
   const [showTipp11, setShowTipp11] = useState(false)
   const [blendOdds, setBlendOdds] = useState(false)
-  const [showTable, setShowTable] = useState(false)
-  const [showCalibration, setShowCalibration] = useState(false)
-  const [showBacktest, setShowBacktest] = useState(false)
-  const [showCLV, setShowCLV] = useState(false)
+  const [activeTab, setActiveTab] = useState('fixtures')
   const [modelVariant, setModelVariant] = useState('base')
   const [bayesPredictions, setBayesPredictions] = useState([])
   const [profileTeam, setProfileTeam] = useState(null)
@@ -194,7 +197,6 @@ export default function App() {
       .catch(err => setFetchState({ variant: modelVariant, predictions: [], error: err.message }))
   }, [modelVariant])
 
-  // Fetch Bayes predictions for side-by-side Tipp 11 comparison
   useEffect(() => {
     if (!showTipp11) return
     axios.get('/api/predictions/upcoming?model_variant=bayes')
@@ -202,7 +204,6 @@ export default function App() {
       .catch(() => setBayesPredictions([]))
   }, [showTipp11])
 
-  // Auto-refresh every 60s while at least one game is live
   useEffect(() => {
     if (liveCount === 0) return
     const id = setInterval(() => {
@@ -230,13 +231,42 @@ export default function App() {
     document.getElementById(`fixture-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
+  const isFixtures = activeTab === 'fixtures'
+
   return (
     <div className="app">
       <AppHeader />
       {profileTeam && <TeamProfile teamName={profileTeam} onClose={() => setProfileTeam(null)} />}
 
-      <div className={`app-body${showTable || showCalibration || showBacktest || showCLV ? ' no-sidebar' : ''}`}>
-        {visiblePredictions.length > 0 && !showTable && !showCalibration && !showBacktest && !showCLV && (
+      {/* Primary navigation */}
+      <nav className="app-nav">
+        <div className="nav-inner">
+          <div className="nav-tabs">
+            {NAV_TABS.map(t => (
+              <button
+                key={t.id}
+                className={`nav-tab${activeTab === t.id ? ' active' : ''}`}
+                onClick={() => setActiveTab(t.id)}
+              >
+                {t.id === 'fixtures' && liveCount > 0 && <span className="nav-live-dot" />}
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <div className="nav-controls">
+            <button
+              className={`filter-btn${modelVariant === 'bayes' ? ' model-active' : ''}`}
+              onClick={() => setModelVariant(v => v === 'base' ? 'bayes' : 'base')}
+              title="Toggle between base Dixon-Coles and Bayesian prior model"
+            >
+              {modelVariant === 'bayes' ? 'Bayes Prior' : 'Base Model'}
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      <div className={`app-body${isFixtures ? '' : ' no-sidebar'}`}>
+        {isFixtures && visiblePredictions.length > 0 && (
           <MatchupSidebar predictions={visiblePredictions} onSelect={scrollToFixture} blendOdds={blendOdds} />
         )}
 
@@ -244,9 +274,9 @@ export default function App() {
           {loading && <div className="status">Loading predictions…</div>}
           {error && <div className="status error">Error: {error}</div>}
 
-          {groups.length > 0 && (
+          {/* Fixture-specific sub-controls */}
+          {isFixtures && groups.length > 0 && (
             <div className="filter-bar">
-              {/* Group 1: data selection */}
               <div className="filter-group">
                 <label htmlFor="matchday-select">Spieltag</label>
                 <select
@@ -276,7 +306,6 @@ export default function App() {
 
               <div className="filter-separator" />
 
-              {/* Group 2: analysis overlays */}
               <button
                 className={`filter-btn${showTipp11 ? ' active' : ''}`}
                 onClick={() => setShowTipp11(v => !v)}
@@ -290,49 +319,6 @@ export default function App() {
                 title="Blend Dixon-Coles (50%) with bookmaker implied probabilities (50%)"
               >
                 Blend odds
-              </button>
-
-              <div className="filter-separator" />
-
-              {/* Group 3: view switches */}
-              <button
-                className={`filter-btn${showTable ? ' view-active' : ''}`}
-                onClick={() => setShowTable(v => !v)}
-              >
-                Table
-              </button>
-
-              <button
-                className={`filter-btn${showCalibration ? ' view-active' : ''}`}
-                onClick={() => setShowCalibration(v => !v)}
-              >
-                Calibration
-              </button>
-
-              <button
-                className={`filter-btn${showBacktest ? ' view-active' : ''}`}
-                onClick={() => setShowBacktest(v => !v)}
-              >
-                Backtest
-              </button>
-
-              <button
-                className={`filter-btn${showCLV ? ' view-active' : ''}`}
-                onClick={() => setShowCLV(v => !v)}
-                title="Closing Line Value — model vs. market's final price"
-              >
-                CLV
-              </button>
-
-              <div className="filter-separator" />
-
-              {/* Group 4: model selector */}
-              <button
-                className={`filter-btn${modelVariant === 'bayes' ? ' model-active' : ''}`}
-                onClick={() => setModelVariant(v => v === 'base' ? 'bayes' : 'base')}
-                title="Toggle between base Dixon-Coles and Bayesian prior model"
-              >
-                {modelVariant === 'bayes' ? 'Bayes Prior' : 'Base Model'}
               </button>
 
               <div className="filter-group team-filter">
@@ -362,25 +348,25 @@ export default function App() {
             </div>
           )}
 
-          {!showTable && !showCalibration && !showBacktest && !showCLV && <AccuracySummary predictions={visiblePredictions} />}
-          {!showTable && !showCalibration && !showBacktest && !showCLV && showTipp11 && (
-            <Tipp11Summary
-              predictions={visiblePredictions}
-              bayesPredictions={bayesPredictions}
-              useBlend={blendOdds}
-            />
-          )}
-
-          {showCLV ? (
+          {/* Main content area */}
+          {activeTab === 'clv' ? (
             <CLVView modelVariant={modelVariant} />
-          ) : showBacktest ? (
+          ) : activeTab === 'backtest' ? (
             <BacktestView />
-          ) : showCalibration ? (
+          ) : activeTab === 'calibration' ? (
             <CalibrationView />
-          ) : showTable ? (
+          ) : activeTab === 'table' ? (
             <LeagueTable onTeamClick={setProfileTeam} />
           ) : (
             <>
+              <AccuracySummary predictions={visiblePredictions} />
+              {showTipp11 && (
+                <Tipp11Summary
+                  predictions={visiblePredictions}
+                  bayesPredictions={bayesPredictions}
+                  useBlend={blendOdds}
+                />
+              )}
               {visiblePredictions.length === 0 && !loading && (
                 <div className="status">
                   {liveOnly ? 'No games currently live.' : 'No fixtures to show.'}
