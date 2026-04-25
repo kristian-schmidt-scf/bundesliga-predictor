@@ -280,7 +280,7 @@ export default function CalibrationView() {
                 const da = params.bayes_fitted ? t.alpha_bayes - t.alpha_base : null
                 const dd = params.bayes_fitted ? t.delta_bayes - t.delta_base : null
                 const dg = params.bayes_fitted ? t.gamma_bayes - t.gamma_base : null
-                const delta = (v, cls) => v == null ? null : (
+                const delta = (v) => v == null ? null : (
                   <td className={`cal-delta ${v > 0.005 ? 'good' : v < -0.005 ? 'bad' : ''}`}>
                     {v > 0 ? '+' : ''}{v.toFixed(3)}
                   </td>

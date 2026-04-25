@@ -26,6 +26,15 @@ function FormPips({ form }) {
   )
 }
 
+function SortHeader({ label, k, sortKey, sortDir, onSort }) {
+  const active = sortKey === k
+  return (
+    <th className={`sortable${active ? ' active' : ''}`} onClick={() => onSort(k)}>
+      {label}{active ? (sortDir === 1 ? ' ↑' : ' ↓') : ''}
+    </th>
+  )
+}
+
 function ZoneBar({ sim }) {
   if (!sim) return <span className="zone-bar-placeholder">—</span>
 
@@ -101,15 +110,6 @@ export default function LeagueTable({ onTeamClick }) {
     return sortDir * (typeof av === 'string' ? av.localeCompare(bv) : av - bv)
   })
 
-  function SortHeader({ label, k }) {
-    const active = sortKey === k
-    return (
-      <th className={`sortable${active ? ' active' : ''}`} onClick={() => handleSort(k)}>
-        {label}{active ? (sortDir === 1 ? ' ↑' : ' ↓') : ''}
-      </th>
-    )
-  }
-
   if (loading) return <div className="status">Loading table…</div>
   if (error)   return <div className="status error">Error: {error}</div>
 
@@ -125,17 +125,17 @@ export default function LeagueTable({ onTeamClick }) {
       <table className="league-table">
         <thead>
           <tr>
-            <SortHeader label="#"   k="position" />
+            <SortHeader label="#"   k="position" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
             <th>Team</th>
-            <SortHeader label="P"   k="played" />
-            <SortHeader label="W"   k="won" />
-            <SortHeader label="D"   k="draw" />
-            <SortHeader label="L"   k="lost" />
-            <SortHeader label="GD"  k="goal_difference" />
-            <SortHeader label="Pts" k="points" />
+            <SortHeader label="P"   k="played"   sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+            <SortHeader label="W"   k="won"      sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+            <SortHeader label="D"   k="draw"     sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+            <SortHeader label="L"   k="lost"     sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+            <SortHeader label="GD"  k="goal_difference" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+            <SortHeader label="Pts" k="points"   sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
             <th className="col-form">Form</th>
-            <SortHeader label="xPts left" k="expected_pts_remaining" />
-            <SortHeader label="Projected"  k="projected_total" />
+            <SortHeader label="xPts left" k="expected_pts_remaining" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+            <SortHeader label="Projected" k="projected_total"        sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
             <th className="col-finish" title="Monte Carlo season finish probabilities (10 000 simulations)">
               Finish zones {simReady ? '' : '…'}
             </th>
