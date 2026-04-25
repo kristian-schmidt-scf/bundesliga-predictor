@@ -66,6 +66,81 @@
   margin-top: 0.15rem;
 }
 
+/* Sparkline */
+.clv-spark-wrap {
+  margin-bottom: 1rem;
+  padding: 0.55rem 0.75rem 0.45rem;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-card);
+}
+
+.clv-spark-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.2rem;
+  overflow-x: auto;
+}
+
+.clv-spark-all-btn {
+  flex-shrink: 0;
+  align-self: center;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--r-btn);
+  color: var(--text-muted);
+  font-size: var(--text-xxs);
+  font-weight: 700;
+  padding: 0.25rem 0.55rem;
+  cursor: pointer;
+  margin-right: 0.35rem;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.clv-spark-all-btn:hover { color: var(--text-primary); border-color: var(--purple); }
+.clv-spark-all-btn.active { color: var(--purple); border-color: var(--purple); background: rgba(108,99,255,0.1); }
+
+.clv-spark-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--r-xs);
+  padding: 0.15rem 0.25rem;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: border-color 0.12s, background 0.12s;
+}
+.clv-spark-btn:hover { border-color: var(--border); }
+.clv-spark-btn.active { border-color: var(--purple); background: rgba(108,99,255,0.07); }
+
+.clv-spark-track {
+  width: 18px;
+  height: 40px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.clv-spark-fill {
+  width: 12px;
+  border-radius: 2px 2px 0 0;
+  min-height: 2px;
+  transition: height 0.2s ease;
+}
+.clv-spark-fill.pos  { background: var(--green); }
+.clv-spark-fill.neg  { background: var(--red); opacity: 0.85; }
+.clv-spark-fill.flat { background: var(--text-muted); opacity: 0.5; }
+.clv-spark-fill.none { background: var(--border); }
+
+.clv-spark-md {
+  font-size: 9px;
+  color: var(--text-dimmed);
+  font-weight: 600;
+  line-height: 1;
+}
+
 /* Notice */
 .clv-notice {
   font-size: var(--text-xs);
