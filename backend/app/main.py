@@ -11,7 +11,7 @@ import logging
 
 from app.routers import fixtures, predictions, table, calibration, model_params, backtest as backtest_router, simulation as simulation_router, teams as teams_router, h2h as h2h_router, odds as odds_router, picks as picks_router, clv as clv_router
 from app.services import backtest as backtest_service
-from app.services import odds_history, user_picks, prediction_cache_db
+from app.services import odds_history, user_picks, prediction_cache_db, recent_fixtures
 from app.services.dixon_coles import get_model, get_model_bayes
 from app.services.football_data import (
     get_historical_results, get_current_season_results, get_current_and_upcoming_fixtures
@@ -126,6 +126,29 @@ async def _odds_poll_loop() -> None:
         await _poll_odds_and_snapshot()
 
 
+async def _recent_fixtures_loop() -> None:
+    """
+    Background task: refresh cross-competition fixture cache daily.
+    First run is immediate so the data is available shortly after startup
+    without blocking the model fit.
+    """
+    while True:
+        try:
+            fixtures = await get_current_and_upcoming_fixtures()
+            team_id_map = {}
+            for f in fixtures:
+                team_id_map[f.home_team.name] = f.home_team.id
+                team_id_map[f.away_team.name] = f.away_team.id
+            logger.info(
+                "=== Refreshing cross-competition fixture cache for %d teams ===",
+                len(team_id_map),
+            )
+            await recent_fixtures.refresh(team_id_map)
+        except Exception as e:
+            logger.warning("Recent fixtures refresh failed: %s", e)
+        await asyncio.sleep(86400)  # refresh once per day
+
+
 async def _pre_kickoff_snapshot_loop() -> None:
     """
     Capture the true closing line by snapshotting odds once per fixture in the
@@ -208,6 +231,7 @@ async def lifespan(app: FastAPI):
     _start_background(_daily_refit_loop())
     _start_background(_odds_poll_loop())
     _start_background(_pre_kickoff_snapshot_loop())
+    _start_background(_recent_fixtures_loop())
 
     yield  # server runs here
 

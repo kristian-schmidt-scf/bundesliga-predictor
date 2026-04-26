@@ -512,21 +512,37 @@ class DixonColesModel:
         }
 
     def _compute_rest(self, team: str, fixture_date: str) -> int | None:
-        """Days since team's most recent match before fixture_date. None if no prior match."""
-        if self._h2h_df is None:
-            return None
+        """
+        Days since team's most recent match before fixture_date.
+        Considers Bundesliga matches from the training data AND any
+        recent European / DFB-Pokal matches from the cross-competition
+        cache (recent_fixtures service).  Returns None if no prior match.
+        """
         fixture_dt = datetime.fromisoformat(fixture_date.replace("Z", "+00:00"))
-        mask = (self._h2h_df["home_team"] == team) | (self._h2h_df["away_team"] == team)
-        team_df = self._h2h_df[mask].copy()
-        if team_df.empty:
+
+        # ── Bundesliga training data ────────────────────────────────────
+        bl_last: datetime | None = None
+        if self._h2h_df is not None:
+            mask = (self._h2h_df["home_team"] == team) | (self._h2h_df["away_team"] == team)
+            team_df = self._h2h_df[mask].copy()
+            if not team_df.empty:
+                team_df["_dt"] = team_df["date"].apply(
+                    lambda d: datetime.fromisoformat(d.replace("Z", "+00:00"))
+                )
+                prior = team_df[team_df["_dt"] < fixture_dt]
+                if not prior.empty:
+                    bl_last = prior["_dt"].max()
+
+        # ── Cross-competition cache (European + DFB-Pokal) ──────────────
+        from app.services import recent_fixtures
+        cross_last = recent_fixtures.get_most_recent_date(team, fixture_dt)
+
+        # Take whichever source reports the most recent match
+        candidates = [d for d in (bl_last, cross_last) if d is not None]
+        if not candidates:
             return None
-        team_df["_dt"] = team_df["date"].apply(
-            lambda d: datetime.fromisoformat(d.replace("Z", "+00:00"))
-        )
-        prior = team_df[team_df["_dt"] < fixture_dt]
-        if prior.empty:
-            return None
-        return (fixture_dt.date() - prior["_dt"].max().date()).days
+        last_match = max(candidates)
+        return (fixture_dt.date() - last_match.date()).days
 
     def _h2h_adjust(
         self, home_team: str, away_team: str, lam_base: float, mu_base: float
