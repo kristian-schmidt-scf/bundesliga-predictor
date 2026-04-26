@@ -208,7 +208,7 @@ async def lifespan(app: FastAPI):
         model.fit(all_results)
         logger.info("=== Base model ready ===")
 
-        backtest_service.set_prefetched_data(historical, current)
+        backtest_service.set_prefetched_data(_merge_results(historical, [], static), current)
 
         logger.info("=== Startup: fitting Bayesian prior model ===")
         try:

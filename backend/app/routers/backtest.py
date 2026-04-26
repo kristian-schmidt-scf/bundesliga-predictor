@@ -11,7 +11,7 @@ _task_ref: set = set()
 @router.get("", response_model=BacktestResult)
 async def get_backtest():
     """
-    Returns walk-forward backtest results for Spieltage 18–30.
+    Returns walk-forward backtest results for all finished Spieltage of the current season.
     Triggers computation on first request; returns status='computing' until ready.
     """
     result = backtest_service.get_result()

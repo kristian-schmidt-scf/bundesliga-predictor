@@ -1,8 +1,8 @@
 """
-Walk-forward backtest for Spieltage 18–30 of the current season.
+Walk-forward backtest across all finished Spieltage of the current season.
 
-For each matchday N in [18, 30]:
-  - Training data = 3 seasons of history + current season Spieltage 1..(N-1)
+For each finished matchday N:
+  - Training data = full historical data + current season Spieltage 1..(N-1)
   - Fit a fresh DixonColesModel (no lookahead)
   - Predict each fixture in Spieltag N
   - Score: Brier, log-loss, tendency accuracy, Tipp 11 expected vs actual
@@ -17,9 +17,6 @@ from app.services.dixon_coles import DixonColesModel
 from app.config import settings
 
 logger = logging.getLogger(__name__)
-
-BACKTEST_FROM = 18
-BACKTEST_TO   = 30
 
 _cache: dict | None = None
 _computing: bool = False
@@ -92,7 +89,6 @@ async def compute_backtest(
     """
     global _cache, _computing
     _computing = True
-    logger.info(f"=== Backtest: starting walk-forward for Spieltage {BACKTEST_FROM}–{BACKTEST_TO} ===")
 
     try:
         if historical is None:
@@ -105,9 +101,24 @@ async def compute_backtest(
         if current_all is None:
             current_all = await football_data.get_current_season_results()
 
+        # All matchdays that have at least one finished result, in order
+        finished_matchdays = sorted(set(
+            r["matchday"] for r in current_all
+            if r.get("matchday") is not None
+            and r.get("home_goals") is not None
+            and r.get("away_goals") is not None
+        ))
+
+        logger.info(
+            "=== Backtest: walk-forward over %d finished Spieltage (%s–%s) ===",
+            len(finished_matchdays),
+            finished_matchdays[0] if finished_matchdays else "?",
+            finished_matchdays[-1] if finished_matchdays else "?",
+        )
+
         per_matchday = []
 
-        for spieltag in range(BACKTEST_FROM, BACKTEST_TO + 1):
+        for spieltag in finished_matchdays:
             # Finished fixtures for this spieltag come from current_all
             finished = [
                 r for r in current_all
@@ -116,7 +127,6 @@ async def compute_backtest(
                 and r.get("away_goals") is not None
             ]
             if not finished:
-                logger.info(f"Backtest: Spieltag {spieltag} — no finished fixtures, skipping")
                 continue
 
             # Training data: history + current season games played before this spieltag
