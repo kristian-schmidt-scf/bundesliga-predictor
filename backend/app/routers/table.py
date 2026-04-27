@@ -9,6 +9,20 @@ router = APIRouter(prefix="/table", tags=["table"])
 SCHEDULED_STATUSES = {"SCHEDULED", "TIMED"}
 
 
+def _compute_form(team_name: str, fixtures) -> str:
+    """Last 5 results for a team as a comma-separated W/D/L string."""
+    results = []
+    for f in fixtures:
+        if f.home_score is None or f.away_score is None:
+            continue
+        if f.home_team.name == team_name:
+            results.append((f.utc_date, "W" if f.home_score > f.away_score else ("D" if f.home_score == f.away_score else "L")))
+        elif f.away_team.name == team_name:
+            results.append((f.utc_date, "W" if f.away_score > f.home_score else ("D" if f.away_score == f.home_score else "L")))
+    results.sort(key=lambda x: x[0])
+    return ",".join(r for _, r in results[-5:])
+
+
 @router.get("", response_model=list[TableEntry])
 async def get_league_table():
     """
@@ -44,6 +58,7 @@ async def get_league_table():
     for row in standings:
         name = row["team_name"]
         ep = round(exp_pts.get(name, 0.0), 1)
+        form = row.get("form") or _compute_form(name, fixtures)
         table.append(TableEntry(
             position=row["position"],
             team=Team(
@@ -60,7 +75,7 @@ async def get_league_table():
             goals_against=row["goals_against"],
             goal_difference=row["goal_difference"],
             points=row["points"],
-            form=row["form"],
+            form=form,
             expected_pts_remaining=ep,
             projected_total=round(row["points"] + ep, 1),
         ))
