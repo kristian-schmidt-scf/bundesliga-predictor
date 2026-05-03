@@ -192,7 +192,13 @@ async def get_standings() -> list[dict]:
 def _parse_fixture(match: dict) -> Fixture:
     home = match["homeTeam"]
     away = match["awayTeam"]
-    full_time = match.get("score", {}).get("fullTime", {})
+    score_obj = match.get("score", {})
+    # fullTime is only populated after the final whistle; fall back to regularTime
+    # so live and half-time scores are visible during the match.
+    full_time = score_obj.get("fullTime", {})
+    regular_time = score_obj.get("regularTime", {})
+    home_goals = full_time.get("home") if full_time.get("home") is not None else regular_time.get("home")
+    away_goals = full_time.get("away") if full_time.get("away") is not None else regular_time.get("away")
     return Fixture(
         id=match["id"],
         home_team=Team(
@@ -210,6 +216,6 @@ def _parse_fixture(match: dict) -> Fixture:
         utc_date=datetime.fromisoformat(match["utcDate"].replace("Z", "+00:00")),
         matchday=match.get("matchday", 0),
         status=match["status"],
-        home_score=full_time.get("home"),
-        away_score=full_time.get("away"),
+        home_score=home_goals,
+        away_score=away_goals,
     )
