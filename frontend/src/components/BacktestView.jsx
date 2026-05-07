@@ -109,8 +109,7 @@ export default function BacktestView() {
   if (data.status === 'computing') return (
     <div className="bt-wrapper">
       <p className="bt-intro">
-        Walk-forward backtest is computing in the background — fitting a fresh model for each of
-        Spieltage 18–{data.matchdays_tested > 0 ? data.matchdays_tested + 17 : 30} (~2 minutes total).
+        Walk-forward backtest is computing in the background (~2 minutes total).
         This page will refresh automatically.
       </p>
       <div className="bt-computing">Computing… please wait</div>
@@ -126,15 +125,19 @@ export default function BacktestView() {
   const t11Diff = data.tipp11_actual - data.tipp11_expected
   const t11DiffStr = `${t11Diff >= 0 ? '+' : ''}${t11Diff.toFixed(1)}`
 
+  const firstSt = data.per_matchday[0]?.matchday ?? 1
+  const lastSt  = data.per_matchday[data.per_matchday.length - 1]?.matchday ?? data.matchdays_tested
+  const totalFixtures = data.per_matchday.reduce((s, r) => s + r.fixtures, 0)
+
   return (
     <div className="bt-wrapper">
       <p className="bt-intro">
-        Walk-forward backtest over <strong>Spieltage 18–{17 + data.matchdays_tested}</strong> of the current
+        Walk-forward backtest over <strong>Spieltage {firstSt}–{lastSt}</strong> of the current
         season. For each matchday, the model was refitted on all data available before that round
         (no lookahead), then scored against the actual results.
       </p>
 
-      <div className="bt-section-title">Aggregate — {data.matchdays_tested} matchdays · {data.matchdays_tested * 9} fixtures</div>
+      <div className="bt-section-title">Aggregate — {data.matchdays_tested} matchdays · {totalFixtures} fixtures</div>
       <div className="bt-stats-row">
         <StatCard label="Brier Score"      value={data.brier_score.toFixed(4)}             note="lower = better" good={data.brier_score < 0.62} />
         <StatCard label="Log-Loss"         value={data.log_loss.toFixed(4)}                note="lower = better" good={data.log_loss < 1.0} />
