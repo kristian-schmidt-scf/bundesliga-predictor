@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import './H2HPanel.css'
 
-export default function H2HPanel({ homeTeam, awayTeam, homeShort, awayShort }) {
+export default function H2HPanel({ homeTeam, awayTeam, homeShort, awayShort, endpoint = '/api/h2h/matches' }) {
   const [open, setOpen] = useState(false)
   const [data, setData] = useState(null)
   const [fetchError, setFetchError] = useState(false)
@@ -10,11 +10,11 @@ export default function H2HPanel({ homeTeam, awayTeam, homeShort, awayShort }) {
 
   useEffect(() => {
     if (!open || data !== null || fetchError) return
-    fetch(`/api/h2h/matches?home_team=${encodeURIComponent(homeTeam)}&away_team=${encodeURIComponent(awayTeam)}`)
+    fetch(`${endpoint}?home_team=${encodeURIComponent(homeTeam)}&away_team=${encodeURIComponent(awayTeam)}`)
       .then(r => r.json())
       .then(d => setData(d))
       .catch(() => setFetchError(true))
-  }, [open, homeTeam, awayTeam, data, fetchError])
+  }, [open, homeTeam, awayTeam, data, fetchError, endpoint])
 
   return (
     <div className="h2h-panel">

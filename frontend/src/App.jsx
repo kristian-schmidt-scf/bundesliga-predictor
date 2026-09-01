@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react'
 import axios from 'axios'
 import FixtureCard from './components/FixtureCard'
 import LeagueTable from './components/LeagueTable'
+import { BL2_ZONES } from './utils/leagueZones'
 import AccuracySummary from './components/AccuracySummary'
 import Tipp11Summary from './components/Tipp11Summary'
 import CalibrationView from './components/CalibrationView'
@@ -64,12 +65,15 @@ const LIVE_STATUSES = new Set(['IN_PLAY', 'PAUSED', 'LIVE'])
 const UPCOMING_STATUSES = new Set(['SCHEDULED', 'TIMED'])
 
 const NAV_TABS = [
-  { id: 'fixtures',    label: 'Fixtures'    },
-  { id: 'table',       label: 'Table'       },
-  { id: 'calibration', label: 'Calibration' },
-  { id: 'backtest',    label: 'Backtest'    },
-  { id: 'clv',         label: 'CLV'         },
+  { id: 'fixtures',     label: 'Fixtures'          },
+  { id: 'table',        label: 'Table'             },
+  { id: 'fixtures-bl2', label: 'Fixtures - 2. Liga' },
+  { id: 'table-bl2',    label: 'Table - 2. Liga'    },
+  { id: 'calibration',  label: 'Calibration'        },
+  { id: 'backtest',     label: 'Backtest'           },
+  { id: 'clv',          label: 'CLV'                },
 ]
+const FIXTURES_TAB_IDS = new Set(['fixtures', 'fixtures-bl2'])
 
 function groupByMatchday(predictions) {
   const groups = {}
@@ -90,6 +94,103 @@ function defaultMatchday(groups) {
   if (upcoming) return upcoming.matchday
   const finished = groups.filter(g => g.fixtures.every(p => p.fixture.status === 'FINISHED'))
   return finished.length > 0 ? finished[finished.length - 1].matchday : groups[0]?.matchday
+}
+
+// Fetches + derives all per-competition fixture state (predictions, live
+// polling, matchday/team/live filters, favourite team). Instantiated once
+// per competition so BL1 and BL2 fixtures never share state -- each has its
+// own matchday selection, filters, and localStorage-persisted favourite.
+function useFixtures(endpoint, { withVariant = false, storageKey } = {}) {
+  const [modelVariant, setModelVariant] = useState('base')
+  const [fetchState, setFetchState] = useState({ key: null, predictions: [], error: null })
+  const [selectedMatchday, setSelectedMatchday] = useState(null)
+  const [liveOnly, setLiveOnly] = useState(false)
+  const [selectedTeam, setSelectedTeam] = useState('')
+  const [favoriteTeam, setFavoriteTeam] = useState(() => localStorage.getItem(storageKey) ?? '')
+  const [lastUpdated, setLastUpdated] = useState(null)
+
+  const url = withVariant ? `${endpoint}?model_variant=${modelVariant}` : endpoint
+  const key = withVariant ? modelVariant : endpoint
+
+  const allPredictions = fetchState.predictions
+  const loading = fetchState.key !== key
+  const error = fetchState.error
+
+  const groups = useMemo(() => groupByMatchday(allPredictions), [allPredictions])
+
+  const teams = useMemo(() => {
+    const s = new Set()
+    for (const p of allPredictions) {
+      s.add(p.fixture.home_team.name)
+      s.add(p.fixture.away_team.name)
+    }
+    return [...s].sort()
+  }, [allPredictions])
+
+  const liveCount = useMemo(
+    () => allPredictions.filter(p => LIVE_STATUSES.has(p.fixture.status)).length,
+    [allPredictions]
+  )
+
+  const visiblePredictions = useMemo(() => {
+    if (loading) return []
+    let preds = allPredictions
+
+    if (liveOnly) {
+      preds = preds.filter(p => LIVE_STATUSES.has(p.fixture.status))
+    } else if (!selectedTeam) {
+      const group = groups.find(g => g.matchday === selectedMatchday)
+      preds = group ? group.fixtures : []
+    }
+
+    if (selectedTeam) {
+      preds = preds.filter(p =>
+        p.fixture.home_team.name === selectedTeam || p.fixture.away_team.name === selectedTeam
+      )
+    }
+
+    return preds
+  }, [loading, allPredictions, groups, selectedMatchday, liveOnly, selectedTeam])
+
+  useEffect(() => {
+    axios.get(url)
+      .then(res => {
+        const preds = res.data
+        setFetchState({ key, predictions: preds, error: null })
+        setSelectedMatchday(defaultMatchday(groupByMatchday(preds)))
+      })
+      .catch(err => setFetchState({ key, predictions: [], error: err.message }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url])
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      axios.get(url)
+        .then(res => {
+          setFetchState(prev => ({ ...prev, predictions: res.data }))
+          setLastUpdated(new Date())
+        })
+        .catch(() => {})
+    }, liveCount > 0 ? 20_000 : 60_000)
+    return () => clearInterval(id)
+  }, [liveCount, url])
+
+  function toggleFavorite() {
+    if (favoriteTeam === selectedTeam) {
+      localStorage.removeItem(storageKey)
+      setFavoriteTeam('')
+    } else {
+      localStorage.setItem(storageKey, selectedTeam)
+      setFavoriteTeam(selectedTeam)
+    }
+  }
+
+  return {
+    modelVariant, setModelVariant,
+    allPredictions, loading, error, groups, teams, liveCount, visiblePredictions,
+    selectedMatchday, setSelectedMatchday, liveOnly, setLiveOnly,
+    selectedTeam, setSelectedTeam, favoriteTeam, toggleFavorite, lastUpdated,
+  }
 }
 
 function MatchupSidebar({ predictions, onSelect, blendOdds }) {
@@ -134,105 +235,36 @@ function MatchupSidebar({ predictions, onSelect, blendOdds }) {
 }
 
 export default function App() {
-  const [fetchState, setFetchState] = useState({ variant: null, predictions: [], error: null })
-  const [selectedMatchday, setSelectedMatchday] = useState(null)
-  const [liveOnly, setLiveOnly] = useState(false)
-  const [selectedTeam, setSelectedTeam] = useState('')
-  const [favoriteTeam, setFavoriteTeam] = useState(() => localStorage.getItem('favTeam') ?? '')
   const [showTipp11, setShowTipp11] = useState(false)
   const [blendOdds, setBlendOdds] = useState(false)
   const [activeTab, setActiveTab] = useState('fixtures')
-  const [modelVariant, setModelVariant] = useState('base')
   const [bayesPredictions, setBayesPredictions] = useState([])
   const [profileTeam, setProfileTeam] = useState(null)
-  const [lastUpdated, setLastUpdated] = useState(null)
 
-  const allPredictions = fetchState.predictions
-  const loading = fetchState.variant !== modelVariant
-  const error = fetchState.error
+  const bl1 = useFixtures('/api/predictions/upcoming', { withVariant: true, storageKey: 'favTeam_bl1' })
+  const bl2 = useFixtures('/api/bl2/fixtures/upcoming', { withVariant: false, storageKey: 'favTeam_bl2' })
 
-  const groups = useMemo(() => groupByMatchday(allPredictions), [allPredictions])
-
-  const teams = useMemo(() => {
-    const s = new Set()
-    for (const p of allPredictions) {
-      s.add(p.fixture.home_team.name)
-      s.add(p.fixture.away_team.name)
-    }
-    return [...s].sort()
-  }, [allPredictions])
-
-  const liveCount = useMemo(
-    () => allPredictions.filter(p => LIVE_STATUSES.has(p.fixture.status)).length,
-    [allPredictions]
-  )
-
-  const visiblePredictions = useMemo(() => {
-    if (loading) return []
-    let preds = allPredictions
-
-    if (liveOnly) {
-      preds = preds.filter(p => LIVE_STATUSES.has(p.fixture.status))
-    } else if (!selectedTeam) {
-      const group = groups.find(g => g.matchday === selectedMatchday)
-      preds = group ? group.fixtures : []
-    }
-
-    if (selectedTeam) {
-      preds = preds.filter(p =>
-        p.fixture.home_team.name === selectedTeam || p.fixture.away_team.name === selectedTeam
-      )
-    }
-
-    return preds
-  }, [loading, allPredictions, groups, selectedMatchday, liveOnly, selectedTeam])
+  const isFixturesBL2 = activeTab === 'fixtures-bl2'
+  const active = isFixturesBL2 ? bl2 : bl1
+  const {
+    loading, error, groups, teams, liveCount, visiblePredictions,
+    selectedMatchday, setSelectedMatchday, liveOnly, setLiveOnly,
+    selectedTeam, setSelectedTeam, favoriteTeam, toggleFavorite, lastUpdated,
+  } = active
 
   useEffect(() => {
-    axios.get(`/api/predictions/upcoming?model_variant=${modelVariant}`)
-      .then(res => {
-        const preds = res.data
-        setFetchState({ variant: modelVariant, predictions: preds, error: null })
-        setSelectedMatchday(defaultMatchday(groupByMatchday(preds)))
-      })
-      .catch(err => setFetchState({ variant: modelVariant, predictions: [], error: err.message }))
-  }, [modelVariant])
-
-  useEffect(() => {
-    if (!showTipp11) return
+    if (!showTipp11 || isFixturesBL2) return
     axios.get('/api/predictions/upcoming?model_variant=bayes')
       .then(res => setBayesPredictions(res.data))
       .catch(() => setBayesPredictions([]))
-  }, [showTipp11])
-
-  // Always poll: 60s when idle (catches kickoff), 20s while live.
-  // Without this, liveCount never becomes >0 because no request ever fires after the initial load.
-  useEffect(() => {
-    const id = setInterval(() => {
-      axios.get(`/api/predictions/upcoming?model_variant=${modelVariant}`)
-        .then(res => {
-          setFetchState(prev => ({ ...prev, predictions: res.data }))
-          setLastUpdated(new Date())
-        })
-        .catch(() => {})
-    }, liveCount > 0 ? 20_000 : 60_000)
-    return () => clearInterval(id)
-  }, [liveCount, modelVariant])
-
-  function toggleFavorite() {
-    if (favoriteTeam === selectedTeam) {
-      localStorage.removeItem('favTeam')
-      setFavoriteTeam('')
-    } else {
-      localStorage.setItem('favTeam', selectedTeam)
-      setFavoriteTeam(selectedTeam)
-    }
-  }
+  }, [showTipp11, isFixturesBL2])
 
   function scrollToFixture(id) {
     document.getElementById(`fixture-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
-  const isFixtures = activeTab === 'fixtures'
+  const isFixturesTab = FIXTURES_TAB_IDS.has(activeTab)
+  const effectiveBlend = blendOdds && !isFixturesBL2  // BL2 has no odds -- blend would be inert
 
   return (
     <div className="app">
@@ -249,26 +281,29 @@ export default function App() {
                 className={`nav-tab${activeTab === t.id ? ' active' : ''}`}
                 onClick={() => setActiveTab(t.id)}
               >
-                {t.id === 'fixtures' && liveCount > 0 && <span className="nav-live-dot" />}
+                {t.id === 'fixtures' && bl1.liveCount > 0 && <span className="nav-live-dot" />}
+                {t.id === 'fixtures-bl2' && bl2.liveCount > 0 && <span className="nav-live-dot" />}
                 {t.label}
               </button>
             ))}
           </div>
-          <div className="nav-controls">
-            <button
-              className={`filter-btn${modelVariant === 'bayes' ? ' model-active' : ''}`}
-              onClick={() => setModelVariant(v => v === 'base' ? 'bayes' : 'base')}
-              title="Toggle between base Dixon-Coles and Bayesian prior model"
-            >
-              {modelVariant === 'bayes' ? 'Bayes Prior' : 'Base Model'}
-            </button>
-          </div>
+          {activeTab === 'fixtures' && (
+            <div className="nav-controls">
+              <button
+                className={`filter-btn${bl1.modelVariant === 'bayes' ? ' model-active' : ''}`}
+                onClick={() => bl1.setModelVariant(v => v === 'base' ? 'bayes' : 'base')}
+                title="Toggle between base Dixon-Coles and Bayesian prior model"
+              >
+                {bl1.modelVariant === 'bayes' ? 'Bayes Prior' : 'Base Model'}
+              </button>
+            </div>
+          )}
         </div>
       </nav>
 
-      <div className={`app-body${isFixtures ? '' : ' no-sidebar'}`}>
-        {isFixtures && visiblePredictions.length > 0 && (
-          <MatchupSidebar predictions={visiblePredictions} onSelect={scrollToFixture} blendOdds={blendOdds} />
+      <div className={`app-body${isFixturesTab ? '' : ' no-sidebar'}`}>
+        {isFixturesTab && visiblePredictions.length > 0 && (
+          <MatchupSidebar predictions={visiblePredictions} onSelect={scrollToFixture} blendOdds={effectiveBlend} />
         )}
 
         <div className="content-column">
@@ -276,7 +311,7 @@ export default function App() {
           {error && <div className="status error">Error: {error}</div>}
 
           {/* Fixture-specific sub-controls */}
-          {isFixtures && groups.length > 0 && (
+          {isFixturesTab && groups.length > 0 && (
             <div className="filter-bar">
               <div className="filter-group">
                 <label htmlFor="matchday-select">Spieltag</label>
@@ -314,13 +349,15 @@ export default function App() {
                 Tipp 11
               </button>
 
-              <button
-                className={`filter-btn${blendOdds ? ' active' : ''}`}
-                onClick={() => setBlendOdds(v => !v)}
-                title="Blend Dixon-Coles (50%) with bookmaker implied probabilities (50%)"
-              >
-                Blend odds
-              </button>
+              {!isFixturesBL2 && (
+                <button
+                  className={`filter-btn${blendOdds ? ' active' : ''}`}
+                  onClick={() => setBlendOdds(v => !v)}
+                  title="Blend Dixon-Coles (50%) with bookmaker implied probabilities (50%)"
+                >
+                  Blend odds
+                </button>
+              )}
 
               <div className="filter-group team-filter">
                 <label htmlFor="team-select">Team</label>
@@ -351,21 +388,28 @@ export default function App() {
 
           {/* Main content area */}
           {activeTab === 'clv' ? (
-            <CLVView modelVariant={modelVariant} />
+            <CLVView modelVariant={bl1.modelVariant} />
           ) : activeTab === 'backtest' ? (
             <BacktestView />
           ) : activeTab === 'calibration' ? (
             <CalibrationView />
           ) : activeTab === 'table' ? (
             <LeagueTable onTeamClick={setProfileTeam} />
+          ) : activeTab === 'table-bl2' ? (
+            <LeagueTable
+              onTeamClick={setProfileTeam}
+              tableEndpoint="/api/bl2/table"
+              simEndpoint="/api/bl2/simulation"
+              zones={BL2_ZONES}
+            />
           ) : (
             <>
               <AccuracySummary predictions={visiblePredictions} />
               {showTipp11 && (
                 <Tipp11Summary
                   predictions={visiblePredictions}
-                  bayesPredictions={bayesPredictions}
-                  useBlend={blendOdds}
+                  bayesPredictions={isFixturesBL2 ? [] : bayesPredictions}
+                  useBlend={effectiveBlend}
                 />
               )}
               {visiblePredictions.length === 0 && !loading && (
@@ -376,7 +420,13 @@ export default function App() {
               <div className="fixture-list">
                 {visiblePredictions.map(p => (
                   <div key={p.fixture.id} id={`fixture-${p.fixture.id}`}>
-                    <FixtureCard prediction={p} showTipp11={showTipp11} blendOdds={blendOdds} onTeamClick={setProfileTeam} />
+                    <FixtureCard
+                      prediction={p}
+                      showTipp11={showTipp11}
+                      blendOdds={effectiveBlend}
+                      onTeamClick={setProfileTeam}
+                      h2hEndpoint={isFixturesBL2 ? '/api/bl2/h2h/matches' : '/api/h2h/matches'}
+                    />
                   </div>
                 ))}
               </div>

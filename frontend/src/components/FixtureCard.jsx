@@ -24,7 +24,7 @@ function restLabel(days) {
   return { text: `${days}d`, cls: 'rest-normal' }
 }
 
-export default function FixtureCard({ prediction, showTipp11, blendOdds, onTeamClick }) {
+export default function FixtureCard({ prediction, showTipp11, blendOdds, onTeamClick, h2hEndpoint }) {
   const { fixture, win_probabilities, expected_home_goals, expected_away_goals, most_likely_score, score_matrix, odds, edge_home_win, edge_draw, edge_away_win,
     rest_days_home, rest_days_away, travel_km } = prediction
 
@@ -102,6 +102,7 @@ export default function FixtureCard({ prediction, showTipp11, blendOdds, onTeamC
         awayTeam={away_team.name}
         homeShort={home_team.short_name}
         awayShort={away_team.short_name}
+        endpoint={h2hEndpoint}
       />
 
       <div className="card-lower">

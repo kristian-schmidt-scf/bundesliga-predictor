@@ -67,6 +67,20 @@ STADIUM_COORDS: dict[str, tuple[float, float]] = {
     "Arminia Bielefeld":         (52.0386,  8.5239),
     "Eintracht Braunschweig":    (52.2750, 10.5270),
     "1. FC Kaiserslautern":      (49.4358,  7.7773),
+    # 2. Bundesliga clubs (OpenLigaDB team-name spellings — see openliga.py).
+    # A few clubs above already cover 2. Liga teams under their BL1 spelling
+    # (Wolfsburg, Heidenheim, Darmstadt, Kiel, Hertha, Greuther Fürth,
+    # Hannover 96, Nürnberg, Braunschweig, Kaiserslautern); the entries below
+    # are either genuinely new clubs or the same club under OpenLigaDB's
+    # slightly different name string.
+    "1. FC Magdeburg":           (52.1256, 11.6708),
+    "Karlsruher SC":             (49.0200,  8.4131),
+    "Energie Cottbus":           (51.7514, 14.3456),
+    "VfL Osnabrück":             (52.2752,  8.0693),
+    "Dynamo Dresden":            (51.0403, 13.7478),
+    "VfL Bochum":                (51.4895,  7.2369),   # = "VfL Bochum 1848"
+    "FC St. Pauli":              (53.5547,  9.9685),   # = "FC St. Pauli 1910"
+    "DSC Arminia Bielefeld":     (52.0386,  8.5239),   # = "Arminia Bielefeld"
 }
 
 # ---------------------------------------------------------------------------
@@ -161,14 +175,17 @@ def _tau(home_goals: int, away_goals: int, lam: float, mu: float, rho: float) ->
 # Vectorized log-likelihood (fast)
 # ---------------------------------------------------------------------------
 
-# Shrinkage for attack/defence parameters toward league average (log-space 0).
-# A team's time-weighted match count rarely exceeds ~8-10 even for ever-present
-# clubs (90-day half-life decays most history away), so a newly promoted team
-# with almost no weighted matches (e.g. one draw) has nothing to stop its MLE
-# estimate from running away toward 0. SHRINKAGE_K acts like a pseudo-count of
-# "average" matches: coefficient = K / (effective_n + K), so it's negligible
-# for well-observed teams and strong for data-starved ones. Same idea as
-# H2H_K below, applied to the base attack/defence fit instead of H2H splits.
+# Shrinkage for attack/defence/home-advantage parameters toward league average
+# (log-space 0). A team's time-weighted match count rarely exceeds ~8-10 even
+# for ever-present clubs (90-day half-life decays most history away), so a
+# newly promoted team with almost no weighted matches (e.g. one home win) has
+# nothing to stop its MLE estimate from running away toward 0 or infinity —
+# this hits gamma (home advantage) just as it hits alpha/delta, since with
+# attack/defence anchored the optimiser will dump any unexplained variance
+# into whichever parameter is still free. SHRINKAGE_K acts like a pseudo-count
+# of "average" matches: coefficient = K / (effective_n + K), so it's
+# negligible for well-observed teams and strong for data-starved ones. Same
+# idea as H2H_K below, applied to the base fit instead of H2H splits.
 SHRINKAGE_K = 2.0
 
 
@@ -228,7 +245,7 @@ def _neg_log_likelihood(
     # Shrink attack/defence toward league average, strongest for teams with
     # little time-weighted data (see SHRINKAGE_K comment above).
     shrink_coef = SHRINKAGE_K / (eff_n + SHRINKAGE_K)
-    reg = np.sum(shrink_coef * (params[:n] ** 2 + params[n:2 * n] ** 2))
+    reg = np.sum(shrink_coef * (params[:n] ** 2 + params[n:2 * n] ** 2 + params[2 * n:3 * n] ** 2))
 
     return -ll + reg
 
@@ -332,7 +349,7 @@ def _neg_log_likelihood_with_prior(
     # above only covers teams with an odds-listed upcoming fixture, so it
     # alone doesn't protect every team from the same degenerate-MLE risk.
     shrink_coef = SHRINKAGE_K / (eff_n + SHRINKAGE_K)
-    reg = np.sum(shrink_coef * (params[:n] ** 2 + params[n:2 * n] ** 2))
+    reg = np.sum(shrink_coef * (params[:n] ** 2 + params[n:2 * n] ** 2 + params[2 * n:3 * n] ** 2))
 
     return -ll + prior_strength * prior + reg
 
@@ -350,6 +367,12 @@ H2H_K = 5.0
 # FORM_KAPPA: dampening exponent — at 0.1 a team with 2× avg PPG gets a ~7% boost.
 FORM_N_GAMES = 5
 FORM_KAPPA = 0.1
+# Pseudo-count of "average" games blended into a team's recent PPG before
+# taking the ratio — without this, a team with zero points across its whole
+# form window (all losses, early season) gets ppg=0 exactly, and 0 ** KAPPA
+# is exactly 0.0, zeroing out its predicted goals entirely. Same shrinkage
+# idea as SHRINKAGE_K above, applied to the small-sample recent-form ratio.
+FORM_SHRINK_K = 2.0
 
 
 class DixonColesModel:
@@ -531,7 +554,8 @@ class DixonColesModel:
         Returns a dict of team -> factor centred around 1.0 (above = good form).
         """
         teams = set(df["home_team"]) | set(df["away_team"])
-        ppg: dict[str, float] = {}
+        pts_sum: dict[str, int] = {}
+        n_games: dict[str, int] = {}
 
         for team in teams:
             mask = (df["home_team"] == team) | (df["away_team"] == team)
@@ -545,12 +569,22 @@ class DixonColesModel:
                 else:
                     pts.append(3 if ag > hg else 1 if ag == hg else 0)
 
-            ppg[team] = float(np.mean(pts)) if pts else 1.5
+            pts_sum[team] = sum(pts)
+            n_games[team] = len(pts)
 
-        avg_ppg = float(np.mean(list(ppg.values())))
-        # Avoid division by zero; centre factor at 1.0
+        raw_ppg = {t: (pts_sum[t] / n_games[t]) if n_games[t] else 1.5 for t in teams}
+        avg_ppg = float(np.mean(list(raw_ppg.values())))
+        if avg_ppg <= 0:
+            return {t: 1.0 for t in teams}
+
+        # Shrink each team's PPG toward the league average by FORM_SHRINK_K
+        # pseudo-games before taking the ratio, so a small/zero sample can't
+        # push the factor to a degenerate extreme.
         return {
-            t: (ppg[t] / avg_ppg) ** FORM_KAPPA if avg_ppg > 0 else 1.0
+            t: (
+                (pts_sum[t] + FORM_SHRINK_K * avg_ppg) / (n_games[t] + FORM_SHRINK_K)
+                / avg_ppg
+            ) ** FORM_KAPPA if n_games[t] else 1.0
             for t in teams
         }
 
@@ -747,6 +781,7 @@ class DixonColesModel:
 
 _model_instance: DixonColesModel | None = None
 _model_bayes: DixonColesModel | None = None
+_model_bl2: DixonColesModel | None = None
 
 
 def get_model() -> DixonColesModel:
@@ -761,3 +796,10 @@ def get_model_bayes() -> DixonColesModel:
     if _model_bayes is None:
         _model_bayes = DixonColesModel()
     return _model_bayes
+
+
+def get_model_bl2() -> DixonColesModel:
+    global _model_bl2
+    if _model_bl2 is None:
+        _model_bl2 = DixonColesModel()
+    return _model_bl2

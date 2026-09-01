@@ -1,17 +1,10 @@
 import { useEffect, useState } from 'react'
 import axios from 'axios'
+import { BL1_ZONES } from '../utils/leagueZones'
 import './LeagueTable.css'
 
-const ZONES = [
-  { from: 1,  to: 4,  label: 'Champions League',   cls: 'zone-cl' },
-  { from: 5,  to: 6,  label: 'Europa League',       cls: 'zone-el' },
-  { from: 7,  to: 7,  label: 'Conference League',   cls: 'zone-ecl' },
-  { from: 16, to: 16, label: 'Relegation playoff',  cls: 'zone-playoff' },
-  { from: 17, to: 18, label: 'Relegated',            cls: 'zone-rel' },
-]
-
-function zoneClass(position) {
-  const z = ZONES.find(z => position >= z.from && position <= z.to)
+function zoneClass(position, zones) {
+  const z = zones.find(z => position >= z.from && position <= z.to)
   return z ? z.cls : ''
 }
 
@@ -35,31 +28,23 @@ function SortHeader({ label, k, sortKey, sortDir, onSort }) {
   )
 }
 
-function ZoneBar({ sim }) {
+function ZoneBar({ sim, zones }) {
   if (!sim) return <span className="zone-bar-placeholder">—</span>
 
-  const { p_cl, p_el, p_ecl, p_playoff, p_relegated } = sim
-  const p_safe = Math.max(0, 1 - p_cl - p_el - p_ecl - p_playoff - p_relegated)
+  const zonePct = zones.map(z => Math.max(0, sim[z.simKey] ?? 0))
+  const p_safe = Math.max(0, 1 - zonePct.reduce((a, b) => a + b, 0))
 
   const segments = [
-    { key: 'cl',      pct: p_cl,       cls: 'zb-cl' },
-    { key: 'el',      pct: p_el,       cls: 'zb-el' },
-    { key: 'ecl',     pct: p_ecl,      cls: 'zb-ecl' },
-    { key: 'safe',    pct: p_safe,     cls: 'zb-safe' },
-    { key: 'playoff', pct: p_playoff,  cls: 'zb-playoff' },
-    { key: 'rel',     pct: p_relegated,cls: 'zb-rel' },
+    ...zones.map((z, i) => ({ key: z.simKey, pct: zonePct[i], cls: z.barCls, label: z.label })),
+    { key: 'safe', pct: p_safe, cls: 'zb-safe', label: 'Safe' },
   ]
 
   const fmt = p => p >= 0.005 ? `${(p * 100).toFixed(0)}%` : null
 
-  const tooltip = [
-    p_cl       > 0.005 && `CL: ${(p_cl * 100).toFixed(1)}%`,
-    p_el       > 0.005 && `EL: ${(p_el * 100).toFixed(1)}%`,
-    p_ecl      > 0.005 && `ECL: ${(p_ecl * 100).toFixed(1)}%`,
-    p_safe     > 0.005 && `Safe: ${(p_safe * 100).toFixed(1)}%`,
-    p_playoff  > 0.005 && `Playoff: ${(p_playoff * 100).toFixed(1)}%`,
-    p_relegated> 0.005 && `Rel: ${(p_relegated * 100).toFixed(1)}%`,
-  ].filter(Boolean).join(' · ')
+  const tooltip = segments
+    .filter(s => s.pct > 0.005)
+    .map(s => `${s.label}: ${(s.pct * 100).toFixed(1)}%`)
+    .join(' · ')
 
   return (
     <div className="zone-bar" title={tooltip}>
@@ -74,30 +59,31 @@ function ZoneBar({ sim }) {
   )
 }
 
-export default function LeagueTable({ onTeamClick }) {
-  const [table, setTable]     = useState([])
+export default function LeagueTable({ onTeamClick, tableEndpoint = '/api/table', simEndpoint = '/api/simulation', zones = BL1_ZONES }) {
+  const [tableState, setTableState] = useState({ endpoint: null, rows: [], error: null })
   const [simMap, setSimMap]   = useState({})
-  const [loading, setLoading] = useState(true)
-  const [error, setError]     = useState(null)
   const [sortKey, setSortKey] = useState('position')
   const [sortDir, setSortDir] = useState(1)
 
-  useEffect(() => {
-    axios.get('/api/table')
-      .then(res => setTable(res.data))
-      .catch(err => setError(err.message))
-      .finally(() => setLoading(false))
-  }, [])
+  const table   = tableState.rows
+  const loading = tableState.endpoint !== tableEndpoint
+  const error   = tableState.error
 
   useEffect(() => {
-    axios.get('/api/simulation')
+    axios.get(tableEndpoint)
+      .then(res => setTableState({ endpoint: tableEndpoint, rows: res.data, error: null }))
+      .catch(err => setTableState({ endpoint: tableEndpoint, rows: [], error: err.message }))
+  }, [tableEndpoint])
+
+  useEffect(() => {
+    axios.get(simEndpoint)
       .then(res => {
         const map = {}
         res.data.teams.forEach(t => { map[t.team_name] = t })
         setSimMap(map)
       })
       .catch(() => {})  // simulation is optional — fail silently
-  }, [])
+  }, [simEndpoint])
 
   function handleSort(key) {
     if (sortKey === key) setSortDir(d => -d)
@@ -118,7 +104,7 @@ export default function LeagueTable({ onTeamClick }) {
   return (
     <div className="league-table-wrapper">
       <div className="zone-legend">
-        {ZONES.map(z => (
+        {zones.map(z => (
           <span key={z.cls} className={`zone-badge ${z.cls}`}>{z.label}</span>
         ))}
       </div>
@@ -143,7 +129,7 @@ export default function LeagueTable({ onTeamClick }) {
         </thead>
         <tbody>
           {sorted.map(row => (
-            <tr key={row.team.id} className={zoneClass(row.position)}>
+            <tr key={row.team.id} className={zoneClass(row.position, zones)}>
               <td className="col-pos">{row.position}</td>
               <td className="col-team">
                 {row.team.crest_url && <img src={row.team.crest_url} className="table-crest" alt="" />}
@@ -161,7 +147,7 @@ export default function LeagueTable({ onTeamClick }) {
               <td className="col-xpts">{row.expected_pts_remaining.toFixed(1)}</td>
               <td className="col-proj">{row.projected_total.toFixed(1)}</td>
               <td className="col-finish">
-                <ZoneBar sim={simMap[row.team.name]} />
+                <ZoneBar sim={simMap[row.team.name]} zones={zones} />
               </td>
             </tr>
           ))}

@@ -98,8 +98,10 @@ class PredictionCache:
 # Module-level singletons — imported by the shim modules
 _instances: dict[str, PredictionCache] = {}
 
-base  = PredictionCache("base")
-bayes = PredictionCache("bayes")
+base     = PredictionCache("base")
+bayes    = PredictionCache("bayes")
+base_bl2 = PredictionCache("base_bl2")
 
-_instances["base"]  = base
-_instances["bayes"] = bayes
+_instances["base"]     = base
+_instances["bayes"]    = bayes
+_instances["base_bl2"] = base_bl2

@@ -9,15 +9,16 @@ from fastapi.middleware.cors import CORSMiddleware
 import asyncio
 import logging
 
-from app.routers import fixtures, predictions, table, calibration, model_params, backtest as backtest_router, simulation as simulation_router, teams as teams_router, h2h as h2h_router, odds as odds_router, picks as picks_router, clv as clv_router
+from app.routers import fixtures, predictions, table, calibration, model_params, backtest as backtest_router, simulation as simulation_router, teams as teams_router, h2h as h2h_router, odds as odds_router, picks as picks_router, clv as clv_router, bl2 as bl2_router
 from app.services import backtest as backtest_service
 from app.services import odds_history, user_picks, prediction_cache_db, recent_fixtures
-from app.services.dixon_coles import get_model, get_model_bayes
+from app.services.dixon_coles import get_model, get_model_bayes, get_model_bl2
 from app.services.football_data import (
     get_historical_results, get_current_season_results, get_current_and_upcoming_fixtures
 )
 from app.services.historical_data import load_historical_data
 from app.services.odds import get_bundesliga_odds, find_odds_for_fixture
+from app.services import openliga
 from app.config import settings
 
 logging.basicConfig(level=logging.INFO)
@@ -59,6 +60,17 @@ async def _run_full_refit() -> list[dict]:
         logger.warning("Bayesian model refit failed: %s", e)
 
     return all_results
+
+
+async def _run_full_refit_bl2() -> None:
+    """Fetch latest 2. Bundesliga data (OpenLigaDB) and refit the BL2 model."""
+    historical = await openliga.get_historical_results_bl2(settings.seasons_to_fetch)
+    current = await openliga.get_current_season_results_bl2()
+    all_results = _merge_results(historical, current, [])
+
+    logger.info("Refitting BL2 model on %d matches", len(all_results))
+    get_model_bl2().fit(all_results)
+    logger.info("BL2 model refit complete")
 
 
 def _build_odds_list(fixtures, odds_map) -> list[dict]:
@@ -116,6 +128,10 @@ async def _daily_refit_loop() -> None:
             await _run_full_refit()
         except Exception as e:
             logger.error("Scheduled refit failed: %s", e)
+        try:
+            await _run_full_refit_bl2()
+        except Exception as e:
+            logger.error("Scheduled BL2 refit failed: %s", e)
 
 
 async def _odds_poll_loop() -> None:
@@ -228,6 +244,14 @@ async def lifespan(app: FastAPI):
         logger.error("Model fitting failed on startup: %s", e)
         logger.warning("Server is running but predictions may be unavailable.")
 
+    logger.info("=== Startup: fitting BL2 model ===")
+    try:
+        await _run_full_refit_bl2()
+        logger.info("=== BL2 model ready ===")
+    except Exception as e:
+        logger.error("BL2 model fitting failed on startup: %s", e)
+        logger.warning("Server is running but BL2 predictions may be unavailable.")
+
     _start_background(_daily_refit_loop())
     _start_background(_odds_poll_loop())
     _start_background(_pre_kickoff_snapshot_loop())
@@ -269,15 +293,19 @@ app.include_router(h2h_router.router, prefix="/api")
 app.include_router(odds_router.router, prefix="/api")
 app.include_router(picks_router.router, prefix="/api")
 app.include_router(clv_router.router, prefix="/api")
+app.include_router(bl2_router.router, prefix="/api")
 
 
 @app.get("/api/health")
 async def health():
     model = get_model()
     model_bayes = get_model_bayes()
+    model_bl2 = get_model_bl2()
     return {
         "status": "ok",
         "model_fitted": model.fitted,
         "model_bayes_fitted": model_bayes.fitted,
         "teams_in_model": len(model.teams) if model.fitted else 0,
+        "model_bl2_fitted": model_bl2.fitted,
+        "teams_in_bl2_model": len(model_bl2.teams) if model_bl2.fitted else 0,
     }
