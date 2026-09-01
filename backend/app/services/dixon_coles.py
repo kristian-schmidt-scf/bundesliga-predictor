@@ -57,6 +57,7 @@ STADIUM_COORDS: dict[str, tuple[float, float]] = {
     "FC Schalke 04":             (51.5546,  7.0680),
     "Hertha BSC":                (52.5145, 13.2394),
     "SpVgg Greuther Fürth":      (49.4797, 10.9783),
+    "SV 07 Elversberg":          (49.3186,  7.1217),
     # Historical teams (2016/17 – 2022/23)
     "Hannover 96":               (52.3603,  9.7330),
     "1. FC Nürnberg":            (49.4278, 11.1224),

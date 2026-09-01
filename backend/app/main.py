@@ -3,7 +3,7 @@ Bundesliga Predictor — FastAPI backend
 """
 
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import asyncio
@@ -233,7 +233,13 @@ async def lifespan(app: FastAPI):
     _start_background(_pre_kickoff_snapshot_loop())
     _start_background(_recent_fixtures_loop())
 
-    yield  # server runs here
+    try:
+        yield  # server runs here
+    finally:
+        for task in list(_bg_tasks):
+            task.cancel()
+        if _bg_tasks:
+            await asyncio.gather(*_bg_tasks, return_exceptions=True)
 
 
 app = FastAPI(
