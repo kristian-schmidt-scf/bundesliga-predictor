@@ -5,7 +5,7 @@
 ![React](https://img.shields.io/badge/React-18-61dafb?logo=react&logoColor=white)
 ![Vite](https://img.shields.io/badge/Vite-5-646cff?logo=vite&logoColor=white)
 
-A personal project that predicts Bundesliga match outcomes using a statistical football model, and compares those predictions against bookmaker odds to find edges. It also serves as a Tipp 11 assistant — working out which scoreline tip maximises your expected points for each fixture.
+A personal project that predicts Bundesliga match outcomes using a statistical football model, and compares those predictions against bookmaker odds to find edges. It also serves as a Tipp 11 assistant — working out which scoreline tip maximises your expected points for each fixture. 2. Bundesliga fixtures and table are covered too, with the same predictive model but no bookmaker data.
 
 The app pulls up to ten seasons of historical results on startup, fits a Dixon-Coles Poisson model, and serves predictions for every upcoming fixture. A React frontend displays score probability heatmaps, win/draw/loss bars, bookmaker odds comparisons, and a live league table with model-projected final standings.
 
@@ -23,6 +23,7 @@ The app pulls up to ten seasons of historical results on startup, fits a Dixon-C
 - **Calibration** — Brier score, log-loss, per-matchday chart, and an ablation table comparing 8 model variants
 - **Back-testing** — walk-forward backtest over Spieltage 18–30: tendency accuracy, Brier, log-loss, Tipp 11 expected vs actual
 - **Live auto-refresh** — polls every 60 seconds when idle (catches kickoff transitions), switching to every 20 seconds while any match is in play
+- **2. Bundesliga** — separate "Fixtures - 2. Liga" and "Table - 2. Liga" tabs, same Dixon-Coles predictions (score heatmap, Tipp 11, H2H, live scores) but no bookmaker odds/edges and no Bayes variant, since 2. Bundesliga has no market data source
 
 ---
 
@@ -40,6 +41,8 @@ On top of the base model, four adjustments are applied at prediction time:
 A second model variant — **Bayes Prior** — re-fits the same Dixon-Coles model but uses market-implied expected goals as priors, blending the model's own estimates toward what bookmakers imply. Both variants are available throughout the UI via the model toggle in the navigation bar.
 
 The calibration ablation table measures whether each of these adjustments actually improves predictive accuracy, making it easy to see which ones earn their place.
+
+2. Bundesliga gets its own model instance, fitted the same way but sourced entirely from [OpenLigaDB](https://www.openligadb.de/) instead of football-data.org (whose free tier doesn't include the second division) — no API key required. There's no Bayes variant for it, since OpenLigaDB has no odds data to prior against.
 
 ---
 
@@ -78,7 +81,7 @@ Start the server:
 python -m uvicorn app.main:app
 ```
 
-On startup the model merges API results with a bundled static dataset covering seven additional seasons, then fits in around 10 seconds. Swagger docs are at `http://localhost:8000/docs`.
+On startup the Bundesliga model merges API results with a bundled static dataset covering seven additional seasons; the 2. Bundesliga model fits alongside it from OpenLigaDB data (no static dataset, no extra config needed). Swagger docs are at `http://localhost:8000/docs`.
 
 ### Frontend
 
@@ -111,6 +114,10 @@ Open `http://localhost:5173`. The Vite dev server proxies all `/api` calls to th
 | `GET /api/h2h/matches` | Head-to-head record between two teams |
 | `GET /api/picks` | Saved Tipp 11 user picks |
 | `GET /api/picks/opponent` | Saved Tipp 11 opponent picks |
+| `GET /api/bl2/fixtures/upcoming` | 2. Bundesliga predictions for upcoming fixtures (no odds, no `model_variant`) |
+| `GET /api/bl2/table` | 2. Bundesliga table + Monte Carlo projected standings |
+| `GET /api/bl2/simulation` | 2. Bundesliga Monte Carlo season simulation |
+| `GET /api/bl2/h2h/matches` | Head-to-head record between two 2. Bundesliga teams |
 
 ---
 
@@ -120,7 +127,7 @@ Open `http://localhost:5173`. The Vite dev server proxies all `/api` calls to th
 |----------|---------|-------------|
 | `FOOTBALL_DATA_API_KEY` | — | Required |
 | `ODDS_API_KEY` | — | Required |
-| `seasons_to_fetch` | `3` | Seasons of API data used for model fitting (merged with static historical set) |
+| `seasons_to_fetch` | `3` | Seasons of API data used for model fitting (merged with static historical set for Bundesliga; used as-is for 2. Bundesliga, which has no static set) |
 | `time_decay_half_life_days` | `90` | Exponential weighting half-life for recent matches |
 | `refit_hour` | `6` | Hour of day (local time) for the scheduled daily model refit |
 | `odds_poll_interval_seconds` | `43200` | Background odds refresh interval (default 12 h; free tier has 500 req/month) |
