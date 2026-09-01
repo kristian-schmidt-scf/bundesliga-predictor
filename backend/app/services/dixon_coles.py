@@ -161,12 +161,34 @@ def _tau(home_goals: int, away_goals: int, lam: float, mu: float, rho: float) ->
 # Vectorized log-likelihood (fast)
 # ---------------------------------------------------------------------------
 
+# Shrinkage for attack/defence parameters toward league average (log-space 0).
+# A team's time-weighted match count rarely exceeds ~8-10 even for ever-present
+# clubs (90-day half-life decays most history away), so a newly promoted team
+# with almost no weighted matches (e.g. one draw) has nothing to stop its MLE
+# estimate from running away toward 0. SHRINKAGE_K acts like a pseudo-count of
+# "average" matches: coefficient = K / (effective_n + K), so it's negligible
+# for well-observed teams and strong for data-starved ones. Same idea as
+# H2H_K below, applied to the base attack/defence fit instead of H2H splits.
+SHRINKAGE_K = 2.0
+
+
+def _effective_sample_counts(
+    hi: np.ndarray, ai: np.ndarray, weights: np.ndarray, n: int
+) -> np.ndarray:
+    """Time-weighted match count per team (home + away appearances)."""
+    eff_n = np.zeros(n)
+    np.add.at(eff_n, hi, weights)
+    np.add.at(eff_n, ai, weights)
+    return eff_n
+
+
 def _neg_log_likelihood(
     params: np.ndarray,
     data: pd.DataFrame,
     teams: list[str],
     weights: np.ndarray,
     team_idx: dict,
+    eff_n: np.ndarray,
 ) -> float:
     n = len(teams)
     alphas = np.exp(params[:n])
@@ -202,7 +224,13 @@ def _neg_log_likelihood(
     tau = np.clip(tau, 1e-10, None)
 
     ll = np.sum(weights * (log_p + np.log(tau)))
-    return -ll
+
+    # Shrink attack/defence toward league average, strongest for teams with
+    # little time-weighted data (see SHRINKAGE_K comment above).
+    shrink_coef = SHRINKAGE_K / (eff_n + SHRINKAGE_K)
+    reg = np.sum(shrink_coef * (params[:n] ** 2 + params[n:2 * n] ** 2))
+
+    return -ll + reg
 
 
 # ---------------------------------------------------------------------------
@@ -257,6 +285,7 @@ def _neg_log_likelihood_with_prior(
     team_idx: dict,
     prior_constraints: list[tuple[int, int, float, float]],  # (hi, ai, log_lam_mkt, log_mu_mkt)
     prior_strength: float,
+    eff_n: np.ndarray,
 ) -> float:
     """Log-likelihood + L2 prior penalising deviation from market-implied goals."""
     n = len(teams)
@@ -299,7 +328,13 @@ def _neg_log_likelihood_with_prior(
         prior += (log_lam_pred - log_lam_mkt) ** 2
         prior += (log_mu_pred  - log_mu_mkt)  ** 2
 
-    return -ll + prior_strength * prior
+    # Same data-starved-team shrinkage as the base model — the market prior
+    # above only covers teams with an odds-listed upcoming fixture, so it
+    # alone doesn't protect every team from the same degenerate-MLE risk.
+    shrink_coef = SHRINKAGE_K / (eff_n + SHRINKAGE_K)
+    reg = np.sum(shrink_coef * (params[:n] ** 2 + params[n:2 * n] ** 2))
+
+    return -ll + prior_strength * prior + reg
 
 
 # ---------------------------------------------------------------------------
@@ -355,6 +390,9 @@ class DixonColesModel:
 
         # Pre-compute team index lookup once
         team_idx = {t: i for i, t in enumerate(self.teams)}
+        hi = np.array([team_idx[t] for t in df["home_team"]])
+        ai = np.array([team_idx[t] for t in df["away_team"]])
+        eff_n = _effective_sample_counts(hi, ai, weights, n)
 
         # Initial params: all zeros in log-space (=> all strengths = 1, gammas = 1)
         x0 = np.zeros(3 * n + 1)
@@ -362,7 +400,7 @@ class DixonColesModel:
         result = minimize(
             _neg_log_likelihood,
             x0,
-            args=(df, self.teams, weights, team_idx),
+            args=(df, self.teams, weights, team_idx, eff_n),
             method="L-BFGS-B",
             options={"maxiter": 2000, "ftol": 1e-9},
         )
@@ -454,11 +492,15 @@ class DixonColesModel:
             f"({skipped} skipped — odds inversion failed)"
         )
 
+        hi = np.array([team_idx[t] for t in df["home_team"]])
+        ai = np.array([team_idx[t] for t in df["away_team"]])
+        eff_n = _effective_sample_counts(hi, ai, weights, n)
+
         x0 = np.zeros(3 * n + 1)
         result = minimize(
             _neg_log_likelihood_with_prior,
             x0,
-            args=(df, self.teams, weights, team_idx, prior_constraints, prior_strength),
+            args=(df, self.teams, weights, team_idx, prior_constraints, prior_strength, eff_n),
             method="L-BFGS-B",
             options={"maxiter": 2000, "ftol": 1e-9},
         )
