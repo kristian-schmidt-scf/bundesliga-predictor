@@ -1,8 +1,8 @@
 """
 SQLite-backed prediction cache.
 
-Predictions for live/finished fixtures are frozen at their first
-computation (pre-kickoff) and must survive server restarts so that a
+Predictions for live/finished fixtures are frozen at their last pre-kickoff
+computation and must survive server restarts so that a
 post-match model refit cannot alter the stored tip.
 
 Two singleton instances are created at module level — one per model
@@ -20,6 +20,8 @@ from app.models.schemas import Prediction
 logger = logging.getLogger(__name__)
 
 _db_path: Path | None = None
+
+_SETTLED_STATUSES = {"IN_PLAY", "PAUSED", "LIVE", "FINISHED", "AWARDED"}
 
 
 def _conn() -> sqlite3.Connection:
@@ -76,17 +78,26 @@ class PredictionCache:
         return self._mem.get(fixture_id)
 
     def set(self, fixture_id: int, prediction: Prediction) -> None:
-        self._mem[fixture_id] = prediction
+        # Pre-kickoff fixtures overwrite the stored row so the value frozen at
+        # kickoff is the last prediction served, not the first ever computed.
+        # Once live/finished, an existing row is never replaced.
+        settled = prediction.fixture.status in _SETTLED_STATUSES
+        if not (settled and fixture_id in self._mem):
+            self._mem[fixture_id] = prediction
         if _db_path is None:
             return
         blob = prediction.model_dump_json()
         frozen_at = datetime.now(timezone.utc).isoformat()
+        on_conflict = (
+            "DO NOTHING" if settled
+            else "DO UPDATE SET prediction = excluded.prediction, frozen_at = excluded.frozen_at"
+        )
         with _conn() as con:
             con.execute(
-                """
+                f"""
                 INSERT INTO prediction_cache (fixture_id, variant, prediction, frozen_at)
                 VALUES (?, ?, ?, ?)
-                ON CONFLICT(fixture_id, variant) DO NOTHING
+                ON CONFLICT(fixture_id, variant) {on_conflict}
                 """,
                 (fixture_id, self._variant, blob, frozen_at),
             )

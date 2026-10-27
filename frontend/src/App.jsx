@@ -101,7 +101,7 @@ function defaultMatchday(groups) {
 // per competition so BL1 and BL2 fixtures never share state -- each has its
 // own matchday selection, filters, and localStorage-persisted favourite.
 function useFixtures(endpoint, { withVariant = false, storageKey } = {}) {
-  const [modelVariant, setModelVariant] = useState('base')
+  const [modelVariant, setModelVariant] = useState('bayes')
   const [fetchState, setFetchState] = useState({ key: null, predictions: [], error: null })
   const [selectedMatchday, setSelectedMatchday] = useState(null)
   const [liveOnly, setLiveOnly] = useState(false)

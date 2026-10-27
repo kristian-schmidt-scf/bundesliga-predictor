@@ -68,7 +68,7 @@ function Sparkline({ matchdays, effectiveMd, onSelect }) {
   )
 }
 
-export default function CLVView({ modelVariant = 'base' }) {
+export default function CLVView({ modelVariant = 'bayes' }) {
   const [fetchState, setFetchState] = useState({ variant: null, data: null, error: null })
   const loading = fetchState.variant !== modelVariant
   const data  = fetchState.data
