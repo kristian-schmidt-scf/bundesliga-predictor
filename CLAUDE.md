@@ -93,7 +93,7 @@ Three module-level singleton model instances exist: `base` and `bayes` (market-i
 | `odds.py` | Bookmaker odds from The Odds API; module-level `_odds_cache` prevents redundant calls — BL1 only |
 | `odds_history.py` | SQLite persistence for odds snapshots (used by CLV tracker) — BL1 only |
 | `user_picks.py` | SQLite persistence for user and opponent Tipp 11 picks; shared across BL1 and BL2 since fixture IDs never collide |
-| `prediction_cache_db.py` | SQLite write-through cache; `ON CONFLICT DO NOTHING` freezes predictions at kickoff permanently; registers `base`, `bayes`, and `base_bl2` variants |
+| `prediction_cache_db.py` | SQLite write-through cache; pre-kickoff writes upsert so the last prediction served before kickoff is what gets frozen, and live/finished fixtures are never overwritten (`ON CONFLICT DO NOTHING`); registers `base`, `bayes`, and `base_bl2` variants |
 | `prediction_cache.py` | Thin shim: re-exports `get/set/get_all` from `prediction_cache_db.base` |
 | `prediction_cache_bayes.py` | Same shim for `prediction_cache_db.bayes` |
 | `prediction_cache_bl2.py` | Same shim for `prediction_cache_db.base_bl2` |
@@ -134,10 +134,10 @@ The Odds API free tier allows 500 requests/month. Calls are tightly controlled:
 | `GET /api/bl2/h2h/matches` | Head-to-head history between two 2. Bundesliga teams |
 | `GET /api/bl2/simulation` | 2. Bundesliga Monte Carlo season simulation |
 
-Settled match predictions are frozen at kickoff via the SQLite prediction cache and survive server restarts. `/api/picks/*` and the prediction cache are shared across both competitions — see the `BL2_ID_OFFSET` note in the Overview above.
+Settled match predictions are frozen at their last pre-kickoff value via the SQLite prediction cache and survive server restarts. `/api/picks/*` and the prediction cache are shared across both competitions — see the `BL2_ID_OFFSET` note in the Overview above.
 
 ### Frontend (`frontend/src/`)
-- **`App.jsx`** — Main router, `activeTab` navigation across both competitions (`fixtures`/`table` for BL1, `fixtures-bl2`/`table-bl2` for BL2), model variant toggle (BL1 only), blend toggle. Fixture-fetching/filtering/live-polling state is extracted into a `useFixtures` hook and instantiated once per competition, so BL1 and BL2 matchday selection, team filter, and favourite team never share state
+- **`App.jsx`** — Main router, `activeTab` navigation across both competitions (`fixtures`/`table` for BL1, `fixtures-bl2`/`table-bl2` for BL2), model variant toggle (BL1 only, defaults to Bayes), blend toggle. Fixture-fetching/filtering/live-polling state is extracted into a `useFixtures` hook and instantiated once per competition, so BL1 and BL2 matchday selection, team filter, and favourite team never share state
 - **`FixtureCard.jsx`** — Per-fixture card with sidebar + expanded main view; live score polling every 20 s (via the parent's `useFixtures` poll, not a per-card fetch); odds panel auto-omits when `odds` is `null` (always the case for BL2), no BL2-specific code needed
 - **`ScoreHeatmap.jsx`** — 9×9 score probability matrix
 - **`OddsComparison.jsx`** — Model vs bookmaker edge bars (averaged across all bookmakers) — BL1 only, never rendered for BL2
